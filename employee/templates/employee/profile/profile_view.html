@@ -238,6 +238,7 @@
 								</li>
 							{% endif %}
 
+							{% if False %}
 							{% if "leave"|app_installed %}
                 				{% if perms.leave.view_leaverequest or request.user|check_manager:employee or request.user == employee.employee_user_id %}
                 				  <li data-cell-index="12" data-cell-title="{% trans 'Leave' %}" class="oh-general__tab">
@@ -264,6 +265,7 @@
 									>{% trans "Payroll" %}</a
 									>
 								</li>
+							{% endif %}
 							{% endif %}
 
 							{% if "payroll"|app_installed %}
