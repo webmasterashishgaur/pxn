@@ -366,7 +366,7 @@ python manage.py runserver 8080   # For Windows
 
 ## **Authors**
 
-[Cybrosys Technologies](https://www.cybrosys.com/)
+[Aimsys Technologies](https://www.aimsys.us/)
 
 ---
 
