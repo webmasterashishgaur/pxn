@@ -14,6 +14,7 @@
     <link rel="icon" type="image/png" sizes="16x16"
         href="{% if white_label_company.icon %}{{white_label_company.icon.url}} {% else %}{% static 'favicons/favicon-16x16.png' %}{% endif %}">
     <link rel="stylesheet" href="{% static '/build/css/style.min.css' %}" />
+    <link rel="stylesheet" href="{% static '/build/css/custom.css' %}" />
     <link rel="manifest" href="{% static 'build/manifest.json' %}" />
 </head>
 
@@ -26,6 +27,11 @@
             </div>
             {% endfor %}
         </div>
+        <header class="login-header">
+            <a href="{% url 'open-recruitments' %}" class="oh-link oh-link--secondary justify-content-center">
+                {% trans "Open Jobs" %}
+            </a>
+        </header>
         <main class="oh-auth">
             <div class="oh-auth-card mb-4">
                 <h1 class="oh-onboarding-card__title oh-onboarding-card__title--h2 text-center my-3">

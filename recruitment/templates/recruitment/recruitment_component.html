@@ -66,24 +66,25 @@
                         <div class="oh-sticky-table__tr">
                           <div class="oh-sticky-table__th {% if request.sort_option.order == '-title' %}arrow-up {% elif request.sort_option.order == 'title' %}arrow-down {% else %} arrow-up-down {% endif %}" hx-get="{% url 'recruitment-search' %}?{{pd}}&orderby=title" hx-target="#recruitment-container">{% trans "Recruitment" %}</div>
                           <div data-cell-index="1" data-cell-title='{% trans "Managers" %}' class="oh-sticky-table__th" >{% trans "Managers" %}</div>
-                          <div data-cell-index="2" data-cell-title='{% trans "Open Jobs" %}' class="oh-sticky-table__th" >{% trans "Open Jobs" %}</div>
-                          <div data-cell-index="3" data-cell-title='{% trans "Vacancy" %}'
+                          <div data-cell-index="2" data-cell-title='{% trans "Job Number" %}' class="oh-sticky-table__th" >{% trans "Job Title" %}</div>
+                          <div data-cell-index="3" data-cell-title='{% trans "Open Jobs" %}' class="oh-sticky-table__th" >{% trans "Open Jobs" %}</div>
+                          <div data-cell-index="4" data-cell-title='{% trans "Vacancy" %}'
                             class="oh-sticky-table__th {% if request.sort_option.order == '-vacancy' %}arrow-up {% elif request.sort_option.order == 'vacancy' %}arrow-down {% else %} arrow-up-down {% endif %}"
                             hx-get="{% url 'recruitment-search' %}?{{pd}}&orderby=vacancy"
                             hx-target="#recruitment-container"
                           >{% trans "Vacancy" %}</div>
-                          <div data-cell-index="4" data-cell-title='{% trans "Total Hires" %}' class="oh-sticky-table__th" >{% trans "Total Hires" %}</div>
-                          <div data-cell-index="5" data-cell-title='{% trans "Start Date" %}'
+                          <div data-cell-index="5" data-cell-title='{% trans "Total Hires" %}' class="oh-sticky-table__th" >{% trans "Total Hires" %}</div>
+                          <div data-cell-index="6" data-cell-title='{% trans "Start Date" %}'
                             class="oh-sticky-table__th {% if request.sort_option.order == '-start_date' %}arrow-up {% elif request.sort_option.order == 'start_date' %}arrow-down {% else %} arrow-up-down {% endif %}"
                             hx-get="{% url 'recruitment-search' %}?{{pd}}&orderby=start_date"
                             hx-target="#recruitment-container"
                           >{% trans "Start Date" %}</div>
-                          <div data-cell-index="6" data-cell-title='{% trans "End Date" %}'
+                          <div data-cell-index="7" data-cell-title='{% trans "End Date" %}'
                             class="oh-sticky-table__th {% if request.sort_option.order == '-end_date' %}arrow-up {% elif request.sort_option.order == 'end_date' %}arrow-down {% else %} arrow-up-down {% endif %}"
                             hx-get="{% url 'recruitment-search' %}?{{pd}}&orderby=end_date"
                             hx-target="#recruitment-container"
                           >{% trans "End Date" %}</div>
-                          <div data-cell-index="7" data-cell-title='{% trans "Status" %}'
+                          <div data-cell-index="8" data-cell-title='{% trans "Status" %}'
                             class="oh-sticky-table__th"
                           >{% trans "Status" %}</div>
                           <div class="oh-sticky-table__th oh-sticky-table__right" style="width: 315px;">{% trans "Actions" %}</div>
@@ -131,7 +132,34 @@
                             <span class="count-span">{{rec.recruitment_managers.all|length}} {% trans "Managers" %}</span>
 
                           </div>
+
                           <div data-cell-index="2" class="oh-sticky-table__td">
+                            {% for manager in rec.recruitment_managers.all %}
+                            <span class="oh-user-panel oh-collapse-panel" data-type="user">
+                              <div class="oh-profile oh-profile--md">
+                                <div class="oh-profile__avatar mr-1">
+                                  <img
+                                  src="https://ui-avatars.com/api/?name={{manager.get_full_name}}&background=random"
+                                  class="oh-profile__image"
+                                  alt="Baby C."
+                                  />
+                                </div>
+                                <span class="oh-profile__name oh-text--dark" title="{{manager}}"
+                                >{{manager.employee_first_name|truncatechars:4}}</span
+                                >
+                              </div>
+                              {% if perms.recruitment.change_recruitment or request.user.employee_get in rec.recruitment_managers.all %}
+                                <a hx-post="{% url 'remove-recruitment-manager' manager.id rec.id %}?{{pd}}&page={{data.number}}"  title="{% trans "Remove" %}" hx-target="#recruitment-container"class="oh-user-panel__remove">
+                                  <ion-icon name="close-outline"></ion-icon>
+                                </a>
+                              {% endif %}
+                            </span>
+                            {% endfor %}
+                            <span class="count-span">{{rec.recruitment_managers.all|length}} {% trans "Managers" %}</span>
+
+                          </div>
+
+                          <div data-cell-index="3" class="oh-sticky-table__td">
                             {% for jb in rec.open_positions.all %}
                             <span class="oh-user-panel oh-collapse-panel" data-type="user">
                               <div class="oh-profile oh-profile--md">
@@ -151,19 +179,19 @@
                             <span class="count-span">{{rec.open_positions.all|length}} {% trans "Jobs" %}</span>
 
                           </div>
-                          <div data-cell-index="3" class="oh-sticky-table__td">
+                          <div data-cell-index="4" class="oh-sticky-table__td">
                             {{rec.vacancy}}
                           </div>
-                          <div data-cell-index="4" class="oh-sticky-table__td">
+                          <div data-cell-index="5" class="oh-sticky-table__td">
                             {{rec.total_hires}} {% trans "Hired" %} <span style="font-size: 12px; color: gray;">{% trans "of" %} {{rec.candidate.all|length}} {% trans "Candidates" %}</span>
                           </div>
-                          <div data-cell-index="5" class="oh-sticky-table__td dateformat_changer">
+                          <div data-cell-index="6" class="oh-sticky-table__td dateformat_changer">
                             {{rec.start_date}}
                           </div>
-                          <div data-cell-index="6" class="oh-sticky-table__td dateformat_changer">
+                          <div data-cell-index="7" class="oh-sticky-table__td dateformat_changer">
                             {{rec.end_date}}
                           </div>
-                          <div data-cell-index="7" class="oh-sticky-table__td">
+                          <div data-cell-index="8" class="oh-sticky-table__td">
                             {% if not rec.closed %}
                             {% trans "Open" %}
                             {% else %}

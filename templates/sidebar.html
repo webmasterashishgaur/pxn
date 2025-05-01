@@ -129,6 +129,7 @@ function initializeSummernote(candId,searchWords,) {
         </a>
       </li>
       {% for menues in sidebar %}
+      {% if menues.menu != "Attendance" and menues.menu != "Leave" and menues.menu != "Payroll" %}
       <li
         class="oh-sidebar__menu-item"
         x-data="{ isOpen: getOpenState('{{menues.app}}GenericNav') }"
@@ -174,6 +175,7 @@ function initializeSummernote(candId,searchWords,) {
           </ul>
         </div>
       </li>
+      {% endif %}
       {% endfor %}
 
       {% if request.user|config_perms %}
@@ -227,71 +229,70 @@ function initializeSummernote(candId,searchWords,) {
           <span>{% trans "Configuration" %}</span>
         </a>
         <div
-          class="oh-sidebar__submenu"
-          id="configNav"
-          x-show="isOpen"
-          x-transition
-          style="display: none"
-          >
-          <ul class="oh-sidebar__submenu-items">
-            {% if "leave"|app_installed and perms.base.view_multipleapprovalcondition %}
-            <li class="oh-sidebar__submenu-item">
-              <a
-                href="{% url 'multiple-approval-condition' %}"
-                class="oh-sidebar__submenu-link"
-                >{% trans "Multiple Approvals" %}</a
-              >
-            </li>
-            {% endif %}
-            {% if perms.base.view_horillamailtemplate %}
-            <li class="oh-sidebar__submenu-item">
-              <a
-                class="oh-sidebar__submenu-link"
-                href="{% url 'view-mail-templates' %}"
-                class="oh-sidebar__submenu-link"
-                >{% trans "Mail Templates" %}</a
-              >
-            </li>
-            {% endif %}
-            {% if "horilla_automations"|app_installed and perms.horilla_automations.view_mailautomation %}
-            <li class="oh-sidebar__submenu-item">
-              <a
-                class="oh-sidebar__submenu-link"
-                href="{% url 'mail-automations' %}"
-                class="oh-sidebar__submenu-link"
-                >{% trans "Mail Automations" %}</a
-              >
-            </li>
-            {% endif %}
-            {% if perms.base.add_holidays %}
-            <li class="oh-sidebar__submenu-item">
-              <a
-                href="{% url 'holiday-view' %}"
-                class="oh-sidebar__submenu-link"
-                >{% trans "Holidays" %}</a
-              >
-            </li>
-            {% endif %}
-            {% if perms.base.view_companyleaves %}
-            <li class="oh-sidebar__submenu-item">
-              <a
-              href="{% url 'company-leave-view' %}"
-              class="oh-sidebar__submenu-link"
-              >{% trans "Company Leaves" %}</a
-              >
-            </li>
-            {% endif %}
-            {% if "leave"|app_installed %}
-            <li class="oh-sidebar__submenu-item">
-              <a
-                href="{% url 'restrict-view' %}"
-                class="oh-sidebar__submenu-link"
-                >{% trans "Restrict Leaves" %}</a
-              >
-            </li>
-            {% endif %}
-          </ul>
-        </div>
+  class="oh-sidebar__submenu"
+  id="configNav"
+  x-show="isOpen"
+  x-transition
+  style="display: none"
+>
+  <ul class="oh-sidebar__submenu-items">
+    {% if "leave"|app_installed and perms.base.view_multipleapprovalcondition %}
+    <li class="oh-sidebar__submenu-item">
+      <a
+        href="{% url 'multiple-approval-condition' %}"
+        class="oh-sidebar__submenu-link"
+      >{% trans "Multiple Approvals" %}</a>
+    </li>
+    {% endif %}
+    {% if perms.base.view_horillamailtemplate %}
+    <li class="oh-sidebar__submenu-item">
+      <a
+        class="oh-sidebar__submenu-link"
+        href="{% url 'view-mail-templates' %}"
+        class="oh-sidebar__submenu-link"
+      >{% trans "Mail Templates" %}</a>
+    </li>
+    {% endif %}
+    {% if "horilla_automations"|app_installed and perms.horilla_automations.view_mailautomation %}
+    <li class="oh-sidebar__submenu-item">
+      <a
+        class="oh-sidebar__submenu-link"
+        href="{% url 'mail-automations' %}"
+        class="oh-sidebar__submenu-link"
+      >{% trans "Mail Automations" %}</a>
+    </li>
+    {% endif %}
+    {% if perms.base.add_holidays %}
+    <li class="oh-sidebar__submenu-item">
+      <a
+        href="{% url 'holiday-view' %}"
+        class="oh-sidebar__submenu-link"
+      >{% trans "Holidays" %}</a>
+    </li>
+    {% endif %}
+    {% if perms.base.view_companyleaves %}
+      <!-- Hide Company Leaves -->
+    {% else %}
+    <li class="oh-sidebar__submenu-item">
+      <a
+        href="{% url 'company-leave-view' %}"
+        class="oh-sidebar__submenu-link"
+      >{% trans "Company Leaves" %}</a>
+    </li>
+    {% endif %}
+    {% if "leave"|app_installed %}
+      <!-- Hide Restrict Leaves -->
+    {% else %}
+    <li class="oh-sidebar__submenu-item">
+      <a
+        href="{% url 'restrict-view' %}"
+        class="oh-sidebar__submenu-link"
+      >{% trans "Restrict Leaves" %}</a>
+    </li>
+    {% endif %}
+  </ul>
+</div>
+
       </li>
       {% endif %}
     </ul>

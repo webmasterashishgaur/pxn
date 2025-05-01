@@ -1,16 +1,16 @@
-# **Horilla 🦍**
+# **Aimsys Recruitment System**
 
 [![AGPL License](https://img.shields.io/badge/license-AGPL-blue.svg)](http://www.gnu.org/licenses/agpl-3.0)
 
-**Horilla** is a Free and Open Source HRMS (Human Resource Management System) Software designed to streamline HR processes and enhance organizational efficiency.
+**Aimsys Recruitment System** is a Free and Open Source HRMS (Human Resource Management System) Software designed to streamline HR processes and enhance organizational efficiency.
 
-![Horilla Screenshot](https://github.com/horilla-opensource/horilla/assets/131998600/1317bd0a-03a8-40be-8fb2-ecb655bb5c13)
+![Aimsys Recruitment System Screenshot](https://github.com/horilla-opensource/horilla/assets/131998600/1317bd0a-03a8-40be-8fb2-ecb655bb5c13)
 
 ---
 
 ## **Installation**
 
-Horilla can be installed on your system by following the steps below. Ensure you have **Python**, **Django**, and a **database** (preferably PostgreSQL) installed as prerequisites.
+Aimsys Recruitment System can be installed on your system by following the steps below. Ensure you have **Python**, **Django**, and a **database** (preferably PostgreSQL) installed as prerequisites.
 
 ---
 
@@ -292,19 +292,14 @@ python manage.py runserver
 
 ---
 
-### **Accessing Horilla**
-
-If everything is configured correctly, you should be able to access your Horilla app at **http://localhost:8000**.
-![Initialize Database in Horilla HRMS](https://www.horilla.com/wp-content/uploads/2024/12/how-to-initialize-the-database-in-horilla-hrms-step-by-step-1-1024x576.png)
-
 
 #### **Initial Setup**
 From the login page, you will have two options:
-1. **Initialize Database**: Use this option to initialize the Horilla database by creating a super admin, headquarter company, department, and job position. Authenticate using the `DB_INIT_PASSWORD` specified in the `.env` file.
+1. **Initialize Database**: Use this option to initialize the Aimsys Recruitment System database by creating a super admin, headquarter company, department, and job position. Authenticate using the `DB_INIT_PASSWORD` specified in the `.env` file.
 2. **Load Demo Data**: Use this option if you want to work with demo data. Authenticate using the `DB_INIT_PASSWORD` specified in the `.env` file.
 
 #### **Running on a Custom Port**
-If you wish to run the Horilla application on a different port, specify the port number after the `runserver` command. For example:
+If you wish to run the Aimsys Recruitment System application on a different port, specify the port number after the `runserver` command. For example:
 ```bash
 python3 manage.py runserver 8080  # For Ubuntu/macOS
 python manage.py runserver 8080   # For Windows
@@ -375,10 +370,3 @@ python manage.py runserver 8080   # For Windows
 
 ---
 
-## **About**
-
-[Horilla](https://www.horilla.com/) is an open-source HRMS solution designed to simplify HR operations and improve organizational efficiency.
-
----
-
-This README provides a comprehensive guide to installing and setting up Horilla on various platforms. If you encounter any issues, feel free to reach out to the Horilla community for support. Happy coding! 🚀

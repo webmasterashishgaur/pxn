@@ -169,6 +169,8 @@ class Recruitment(HorillaModel):
     optional_resume = models.BooleanField(
         default=False, help_text=_("Resume not mandatory for candidate creation")
     )
+    job_number = models.CharField(max_length=30, null=True, blank=True)
+
 
     class Meta:
         """
