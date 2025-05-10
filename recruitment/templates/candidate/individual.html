@@ -288,6 +288,15 @@
               >{% trans "Scheduled Interviews" %}</a
             >
           </li>
+          <li class="oh-general__tab">
+            <a
+              href="#"
+              class="oh-general__tab-link"
+              data-action="general-tab"
+              data-target="#parsed-resume-details"
+              >{% trans "Parsed Resume Details" %}</a
+            >
+          </li>
         </ul>
 
         <div
@@ -656,6 +665,107 @@
         </div>
 
         </div>
+        <div class="oh-general__tab-target oh-profile__info-tab mb-4 d-none" id="parsed-resume-details">
+          <div class="oh-card oh-card--margin">
+            <div class="oh-card__header">
+              <span class="oh-card__title oh-card__title--sm fw-bold me-2">
+                {% trans "Parsed Resume Details" %}
+              </span>
+            </div>
+            <div class="oh-card__body mt-4">
+              {% if candidate.parsed_resume_details %}
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <h6>{% trans "Education" %}</h6>
+                  {% if candidate.parsed_resume_details.education %}
+                  {% if candidate.parsed_resume_details.education|length > 0 %}
+                  <ul class="list-group">
+                    {% for edu in candidate.parsed_resume_details.education %}
+                    <li class="list-group-item">
+                      {% if edu.items %}
+                      <strong>{{ edu.degree|default:"" }}</strong>
+                      {% if edu.institution %} at {{ edu.institution }}{% endif %}
+                      {% if edu.years %} ({{ edu.years }}){% endif %}
+                      {% if edu.concentration %}<br><span class="text-muted">{{ edu.concentration }}</span>{% endif %}
+                      {% else %}
+                      {{ edu }}
+                      {% endif %}
+                    </li>
+                    {% endfor %}
+                  </ul>
+                  {% else %}
+                  <span class="text-muted">-</span>
+                  {% endif %}
+                  {% else %}
+                  <span class="text-muted">-</span>
+                  {% endif %}
+                </div>
+                <div class="col-md-6 mb-3">
+                  <h6>{% trans "Skills" %}</h6>
+                  {% if candidate.parsed_resume_details.skills %}
+                  {% if candidate.parsed_resume_details.skills|length > 0 %}
+                  <ul class="list-group list-group-flush">
+                    {% for skill in candidate.parsed_resume_details.skills %}
+                    <li class="list-group-item">{{ skill }}</li>
+                    {% endfor %}
+                  </ul>
+                  {% else %}
+                  <span class="text-muted">-</span>
+                  {% endif %}
+                  {% else %}
+                  <span class="text-muted">-</span>
+                  {% endif %}
+                </div>
+                <div class="col-md-6 mb-3">
+                  <h6>{% trans "Experience" %}</h6>
+                  {% if candidate.parsed_resume_details.experience %}
+                  {% if candidate.parsed_resume_details.experience|length > 0 %}
+                  <ul class="list-group">
+                    {% for exp in candidate.parsed_resume_details.experience %}
+                    <li class="list-group-item">
+                      {% if exp.items %}
+                      <strong>{{ exp.title|default:"" }}</strong>
+                      {% if exp.company %} at {{ exp.company }}{% endif %}
+                      {% if exp.years %} ({{ exp.years }}){% endif %}
+                      {% else %}
+                      {{ exp }}
+                      {% endif %}
+                    </li>
+                    {% endfor %}
+                  </ul>
+                  {% else %}
+                  <span class="text-muted">-</span>
+                  {% endif %}
+                  {% else %}
+                  <span class="text-muted">-</span>
+                  {% endif %}
+                </div>
+                <div class="col-md-6 mb-3">
+                  <h6>{% trans "Certifications" %}</h6>
+                  {% if candidate.parsed_resume_details.certifications %}
+                  {% if candidate.parsed_resume_details.certifications|length > 0 %}
+                  <ul class="list-group list-group-flush">
+                    {% for cert in candidate.parsed_resume_details.certifications %}
+                    <li class="list-group-item">{{ cert }}</li>
+                    {% endfor %}
+                  </ul>
+                  {% else %}
+                  <span class="text-muted">-</span>
+                  {% endif %}
+                  {% else %}
+                  <span class="text-muted">-</span>
+                  {% endif %}
+                </div>
+                <div class="col-12 mb-3">
+                  <h6>{% trans "Summary" %}</h6>
+                  <p>{{ candidate.parsed_resume_details.summary|default_if_none:"-" }}</p>
+                </div>
+              </div>
+              {% else %}
+              <p class="text-muted">{% trans "No parsed resume details available." %}</p>
+              {% endif %}
+            </div>
+          </div>
       </div>
     </div>
   </div>

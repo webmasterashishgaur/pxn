@@ -117,6 +117,7 @@ from recruitment.models import (
     StageNote,
 )
 from recruitment.views.paginator_qry import paginator_qry
+from recruitment.methods import parse_resume_with_groq
 
 
 def is_stagemanager(request, stage_id=False):
@@ -2956,7 +2957,24 @@ def resume_completion(request):
     resume_file = request.FILES["resume"]
     contact_info = extract_info(resume_file)
 
-    return JsonResponse(contact_info)
+    # Convert PDF to plain text for the LLM
+    resume_file.seek(0)
+    pdf_bytes = resume_file.read()
+    pdf_doc = io.BytesIO(pdf_bytes)
+    doc = fitz.open("pdf", pdf_doc)
+    all_text = "\n".join([page.get_text() for page in doc])
+
+    # Call Llama 4 via Groq to parse resume details
+    llm_result = parse_resume_with_groq(all_text)
+
+    # Store LLM result in session for later persistence
+    request.session["parsed_resume_details"] = llm_result
+
+    return JsonResponse({
+        **contact_info,
+        "parsed_resume_details": llm_result or {},
+    })
+
 
 
 def check_vaccancy(request):
