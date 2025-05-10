@@ -1017,3 +1017,26 @@ class CandidateDocument(HorillaModel):
                 raise ValidationError(
                     {"document": _("Please upload {} file only.").format(format)}
                 )
+
+
+class ParsedResumeDetails(HorillaModel):
+    candidate = models.OneToOneField(
+        Candidate,
+        on_delete=models.CASCADE,
+        related_name="parsed_resume_details",
+        verbose_name=_("Candidate"),
+    )
+    education = models.JSONField(null=True, blank=True, verbose_name=_("Education"))
+    skills = models.JSONField(null=True, blank=True, verbose_name=_("Skills"))
+    experience = models.JSONField(null=True, blank=True, verbose_name=_("Experience"))
+    certifications = models.JSONField(null=True, blank=True, verbose_name=_("Certifications"))
+    summary = models.TextField(null=True, blank=True, verbose_name=_("Summary"))
+    llm_model = models.CharField(max_length=100, null=True, blank=True, verbose_name=_("LLM Model"))
+    raw_json = models.JSONField(null=True, blank=True, verbose_name=_("Raw LLM Output"))
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = HorillaCompanyManager(related_company_field="candidate__recruitment_id__company_id")
+
+    def __str__(self):
+        return f"ParsedResumeDetails for {self.candidate}"
