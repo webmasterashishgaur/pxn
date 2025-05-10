@@ -43,6 +43,7 @@ from recruitment.models import (
     Resume,
     Stage,
     SurveyTemplate,
+    ParsedResumeDetails
 )
 from recruitment.pipeline_grouper import group_by_queryset
 from recruitment.views.paginator_qry import paginator_qry
@@ -405,6 +406,21 @@ def application_form(request):
                 except:
                     return redirect(candidate_survey)
             candidate_obj.save()
+
+            # Retrieve and persist parsed resume details from session
+            parsed_details = request.session.get("parsed_resume_details")
+            if parsed_details:
+                ParsedResumeDetails.objects.create(
+                    candidate=candidate_obj,
+                    education=parsed_details.get("education"),
+                    skills=parsed_details.get("skills"),
+                    experience=parsed_details.get("experience"),
+                    certifications=parsed_details.get("certifications"),
+                    summary=parsed_details.get("summary"),
+                    raw_json=parsed_details,
+                )
+                # Clear the session
+                del request.session["parsed_resume_details"]
 
             if resume_obj:
                 resume_obj.is_candidate = True
