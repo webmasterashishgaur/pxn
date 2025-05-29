@@ -60,6 +60,7 @@ from recruitment.models import (
     StageFiles,
     StageNote,
     SurveyTemplate,
+    ParsedResumeDetails,
 )
 
 logger = logging.getLogger(__name__)
@@ -522,7 +523,7 @@ class ApplicationForm(RegistrationForm):
         request = getattr(_thread_locals, "request", None)
 
         errors = {}
-        profile = self.cleaned_data["profile"]
+        profile = self.cleaned_data["profile"]     
         resume = self.cleaned_data["resume"]
         recruitment: Recruitment = self.cleaned_data["recruitment_id"]
         if not resume and not recruitment.optional_resume:
@@ -1310,3 +1311,262 @@ class CandidateDocumentForm(ModelForm):
         context = {"form": self}
         table_html = render_to_string("common_form.html", context)
         return table_html
+
+
+class ParsedResumeDetailsForm(forms.Form):
+    """
+    Form for editing parsed resume details
+    """
+    
+    def __init__(self, *args, **kwargs):
+        instance = kwargs.pop('instance', None)
+        super().__init__(*args, **kwargs)
+        
+        if instance and instance.parsed_resume_details:
+            details = instance.parsed_resume_details
+            
+            # Education fields
+            education = details.education or []
+            for i, edu in enumerate(education):
+                if isinstance(edu, dict):
+                    self.fields[f'education_degree_{i}'] = forms.CharField(
+                        required=False, 
+                        initial=edu.get('degree', ''),
+                        label=f'{_("Degree")} {i+1}',
+                        widget=forms.Textarea(attrs={
+                            'class': 'form-control w-100', 
+                            'placeholder': _('e.g., Bachelor\'s Degree, Master\'s Degree'),
+                            'style': 'font-size: 14px; padding: 15px; min-height: 50px; resize: vertical; width: 100%;',
+                            'rows': 1
+                        })
+                    )
+                    self.fields[f'education_institution_{i}'] = forms.CharField(
+                        required=False, 
+                        initial=edu.get('institution', ''),
+                        label=f'{_("Institution")} {i+1}',
+                        widget=forms.Textarea(attrs={
+                            'class': 'form-control w-100', 
+                            'placeholder': _('e.g., University of California, MIT'),
+                            'style': 'font-size: 14px; padding: 15px; min-height: 50px; resize: vertical; width: 100%;',
+                            'rows': 1
+                        })
+                    )
+                    self.fields[f'education_years_{i}'] = forms.CharField(
+                        required=False, 
+                        initial=edu.get('years', ''),
+                        label=f'{_("Years")} {i+1}',
+                        widget=forms.Textarea(attrs={
+                            'class': 'form-control w-100', 
+                            'placeholder': _('e.g., 2018-2022, 2020'),
+                            'style': 'font-size: 14px; padding: 15px; min-height: 50px; resize: vertical; width: 100%;',
+                            'rows': 1
+                        })
+                    )
+                    self.fields[f'education_concentration_{i}'] = forms.CharField(
+                        required=False, 
+                        initial=edu.get('concentration', ''),
+                        label=f'{_("Concentration")} {i+1}',
+                        widget=forms.Textarea(attrs={
+                            'class': 'form-control w-100', 
+                            'placeholder': _('e.g., Computer Science, Business Administration'),
+                            'style': 'font-size: 14px; padding: 15px; min-height: 50px; resize: vertical; width: 100%;',
+                            'rows': 1
+                        })
+                    )
+                else:
+                    self.fields[f'education_text_{i}'] = forms.CharField(
+                        required=False, 
+                        initial=str(edu),
+                        label=f'{_("Education")} {i+1}',
+                        widget=forms.Textarea(attrs={
+                            'class': 'form-control w-100', 
+                            'rows': 3,
+                            'style': 'font-size: 14px; padding: 15px; min-height: 80px; resize: vertical; width: 100%;',
+                            'placeholder': _('Enter education details...')
+                        })
+                    )
+            
+            # Skills fields
+            skills = details.skills or []
+            for i, skill in enumerate(skills):
+                self.fields[f'skill_{i}'] = forms.CharField(
+                    required=False, 
+                    initial=str(skill),
+                    label=f'{_("Skill")} {i+1}',
+                    widget=forms.Textarea(attrs={
+                        'class': 'form-control w-100',
+                        'style': 'font-size: 14px; padding: 15px; min-height: 50px; resize: vertical; width: 100%;',
+                        'placeholder': _('e.g., Python, Project Management, Communication'),
+                        'rows': 1
+                    })
+                )
+            
+            # Experience fields
+            experience = details.experience or []
+            for i, exp in enumerate(experience):
+                if isinstance(exp, dict):
+                    self.fields[f'experience_title_{i}'] = forms.CharField(
+                        required=False, 
+                        initial=exp.get('title', ''),
+                        label=f'{_("Job Title")} {i+1}',
+                        widget=forms.Textarea(attrs={
+                            'class': 'form-control w-100', 
+                            'placeholder': _('e.g., Software Engineer, Marketing Manager'),
+                            'style': 'font-size: 14px; padding: 15px; min-height: 50px; resize: vertical; width: 100%;',
+                            'rows': 1
+                        })
+                    )
+                    self.fields[f'experience_company_{i}'] = forms.CharField(
+                        required=False, 
+                        initial=exp.get('company', ''),
+                        label=f'{_("Company")} {i+1}',
+                        widget=forms.Textarea(attrs={
+                            'class': 'form-control w-100', 
+                            'placeholder': _('e.g., Google, Microsoft, ABC Corp'),
+                            'style': 'font-size: 14px; padding: 15px; min-height: 50px; resize: vertical; width: 100%;',
+                            'rows': 1
+                        })
+                    )
+                    self.fields[f'experience_years_{i}'] = forms.CharField(
+                        required=False, 
+                        initial=exp.get('years', ''),
+                        label=f'{_("Years")} {i+1}',
+                        widget=forms.Textarea(attrs={
+                            'class': 'form-control w-100', 
+                            'placeholder': _('e.g., 2020-2023, Jan 2021 - Present'),
+                            'style': 'font-size: 14px; padding: 15px; min-height: 50px; resize: vertical; width: 100%;',
+                            'rows': 1
+                        })
+                    )
+                else:
+                    self.fields[f'experience_text_{i}'] = forms.CharField(
+                        required=False, 
+                        initial=str(exp),
+                        label=f'{_("Experience")} {i+1}',
+                        widget=forms.Textarea(attrs={
+                            'class': 'form-control w-100', 
+                            'rows': 3,
+                            'style': 'font-size: 14px; padding: 15px; min-height: 80px; resize: vertical; width: 100%;',
+                            'placeholder': _('Enter experience details...')
+                        })
+                    )
+            
+            # Certifications fields
+            certifications = details.certifications or []
+            for i, cert in enumerate(certifications):
+                self.fields[f'certification_{i}'] = forms.CharField(
+                    required=False, 
+                    initial=str(cert),
+                    label=f'{_("Certification")} {i+1}',
+                    widget=forms.Textarea(attrs={
+                        'class': 'form-control w-100',
+                        'style': 'font-size: 14px; padding: 15px; min-height: 50px; resize: vertical; width: 100%;',
+                        'placeholder': _('e.g., AWS Certified, PMP, Google Analytics'),
+                        'rows': 1
+                    })
+                )
+            
+            # Summary field
+            self.fields['summary'] = forms.CharField(
+                required=False,
+                initial=details.summary or '',
+                label=_('Summary'),
+                widget=forms.Textarea(attrs={
+                    'class': 'form-control w-100', 
+                    'rows': 6,
+                    'style': 'font-size: 14px; padding: 15px; min-height: 120px; resize: vertical; width: 100%;',
+                    'placeholder': _('Enter a brief professional summary...')
+                })
+            )
+    
+    def save(self, candidate):
+        """
+        Save the form data to the candidate's parsed resume details
+        """
+        # Get or create parsed resume details
+        parsed_details, created = ParsedResumeDetails.objects.get_or_create(
+            candidate=candidate,
+            defaults={
+                'education': [],
+                'skills': [],
+                'experience': [],
+                'certifications': [],
+                'summary': ''
+            }
+        )
+        
+        # Process education
+        education = []
+        i = 0
+        while True:
+            if f'education_degree_{i}' in self.cleaned_data:
+                degree = self.cleaned_data.get(f'education_degree_{i}', '').strip()
+                institution = self.cleaned_data.get(f'education_institution_{i}', '').strip()
+                years = self.cleaned_data.get(f'education_years_{i}', '').strip()
+                concentration = self.cleaned_data.get(f'education_concentration_{i}', '').strip()
+                
+                if any([degree, institution, years, concentration]):
+                    education.append({
+                        'degree': degree,
+                        'institution': institution,
+                        'years': years,
+                        'concentration': concentration
+                    })
+            elif f'education_text_{i}' in self.cleaned_data:
+                text = self.cleaned_data.get(f'education_text_{i}', '').strip()
+                if text:
+                    education.append(text)
+            else:
+                break
+            i += 1
+        
+        # Process skills
+        skills = []
+        i = 0
+        while f'skill_{i}' in self.cleaned_data:
+            skill = self.cleaned_data.get(f'skill_{i}', '').strip()
+            if skill:
+                skills.append(skill)
+            i += 1
+        
+        # Process experience
+        experience = []
+        i = 0
+        while True:
+            if f'experience_title_{i}' in self.cleaned_data:
+                title = self.cleaned_data.get(f'experience_title_{i}', '').strip()
+                company = self.cleaned_data.get(f'experience_company_{i}', '').strip()
+                years = self.cleaned_data.get(f'experience_years_{i}', '').strip()
+                
+                if any([title, company, years]):
+                    experience.append({
+                        'title': title,
+                        'company': company,
+                        'years': years
+                    })
+            elif f'experience_text_{i}' in self.cleaned_data:
+                text = self.cleaned_data.get(f'experience_text_{i}', '').strip()
+                if text:
+                    experience.append(text)
+            else:
+                break
+            i += 1
+        
+        # Process certifications
+        certifications = []
+        i = 0
+        while f'certification_{i}' in self.cleaned_data:
+            cert = self.cleaned_data.get(f'certification_{i}', '').strip()
+            if cert:
+                certifications.append(cert)
+            i += 1
+        
+        # Update the parsed details
+        parsed_details.education = education
+        parsed_details.skills = skills
+        parsed_details.experience = experience
+        parsed_details.certifications = certifications
+        parsed_details.summary = self.cleaned_data.get('summary', '').strip()
+        parsed_details.save()
+        
+        return parsed_details

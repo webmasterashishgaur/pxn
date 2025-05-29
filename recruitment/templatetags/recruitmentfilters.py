@@ -164,3 +164,29 @@ def to_json(value):
         {"id": val.id, "stage": val.stage, "type": val.stage_type} for val in value
     ]
     return json.dumps(ordered_list)
+
+
+@register.filter(name="smart_split")
+def smart_split(value):
+    """
+    This filter handles both array and string formats for skills/certifications.
+    If it's a long string, it splits by common delimiters.
+    If it's already an array, it returns as is.
+    """
+    if isinstance(value, list):
+        # If it's already a list, check if any item is a long concatenated string
+        result = []
+        for item in value:
+            if isinstance(item, str) and len(item) > 100:
+                # Split long strings by common delimiters
+                parts = item.replace(' & ', ',').replace(' and ', ',').replace(';', ',').split(',')
+                result.extend([part.strip() for part in parts if part.strip()])
+            else:
+                result.append(item)
+        return result
+    elif isinstance(value, str):
+        # If it's a string, split by common delimiters
+        parts = value.replace(' & ', ',').replace(' and ', ',').replace(';', ',').split(',')
+        return [part.strip() for part in parts if part.strip()]
+    else:
+        return value

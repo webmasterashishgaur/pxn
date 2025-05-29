@@ -253,6 +253,16 @@ urlpatterns = [
         kwargs={"model": Candidate},
     ),
     path(
+        "update-parsed-resume/<int:candidate_id>/",
+        recruitment.views.surveys.update_parsed_resume,
+        name="update-parsed-resume",
+    ),
+    path(
+        "edit-parsed-resume/<int:candidate_id>/",
+        recruitment.views.surveys.edit_parsed_resume,
+        name="edit-parsed-resume",
+    ),
+    path(
         "delete-profile-image/<int:obj_id>/",
         views.delete_profile_image,
         name="delete-profile-image",

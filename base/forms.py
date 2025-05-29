@@ -522,7 +522,7 @@ class JobPositionMultiForm(ModelForm):
         """
         Validate that the job position does not already exist in the selected departments.
         """
-        cleaned_data = super().clean()
+        cleaned_data = super().clean() 
         department_ids = self.data.getlist("department_id")
         job_position = self.data.get("job_position")
 
