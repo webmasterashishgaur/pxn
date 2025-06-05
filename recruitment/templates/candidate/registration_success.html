@@ -1,0 +1,234 @@
+{% extends 'index.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block content %}
+<style>
+    .success-container {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 40px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    
+    .success-icon {
+        font-size: 80px;
+        color: #28a745;
+        margin-bottom: 20px;
+    }
+    
+    .success-title {
+        color: #2c5282;
+        font-size: 32px;
+        font-weight: bold;
+        margin-bottom: 15px;
+    }
+    
+    .success-message {
+        color: #666;
+        font-size: 18px;
+        margin-bottom: 30px;
+        line-height: 1.6;
+    }
+    
+    .candidate-info {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin: 30px 0;
+        text-align: left;
+    }
+    
+    .candidate-info h4 {
+        color: #2c5282;
+        margin-bottom: 15px;
+        text-align: center;
+    }
+    
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .info-row:last-child {
+        border-bottom: none;
+    }
+    
+    .info-label {
+        font-weight: bold;
+        color: #495057;
+    }
+    
+    .info-value {
+        color: #6c757d;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-top: 40px;
+    }
+    
+    .btn-primary {
+        background: #2c5282;
+        border: none;
+        padding: 15px 30px;
+        font-size: 16px;
+        font-weight: bold;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-primary:hover {
+        background: #2a5073;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(44, 82, 130, 0.3);
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 15px 30px;
+        font-size: 16px;
+        font-weight: bold;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-secondary:hover {
+        background: #5a6268;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(108, 117, 125, 0.3);
+        color: white;
+    }
+    
+    .pdf-icon {
+        margin-right: 8px;
+    }
+</style>
+
+<div class="oh-wrapper">
+    <div class="success-container">
+        <!-- Success Icon -->
+        <div class="success-icon">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        
+        <!-- Success Title -->
+        <h1 class="success-title">{% trans "Registration Successful!" %}</h1>
+        
+        <!-- Success Message -->
+        <p class="success-message">
+            {% trans "Thank you for your application! Your candidate registration has been successfully submitted. You can now generate a PDF copy of your application for your records." %}
+        </p>
+        
+        <!-- Candidate Information Summary -->
+        {% if registration_data.form_data %}
+        <div class="candidate-info">
+            <h4>{% trans "Application Summary" %}</h4>
+            
+            <div class="info-row">
+                <span class="info-label">{% trans "Full Name:" %}</span>
+                <span class="info-value">{{ registration_data.form_data.name|default:"-" }}</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">{% trans "Email:" %}</span>
+                <span class="info-value">{{ registration_data.form_data.email|default:"-" }}</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">{% trans "Phone:" %}</span>
+                <span class="info-value">{{ registration_data.form_data.mobile|default:"-" }}</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">{% trans "Position Applied For:" %}</span>
+                <span class="info-value">{{ registration_data.form_data.job_position_id|default:"-" }}</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">{% trans "Recruitment:" %}</span>
+                <span class="info-value">{{ registration_data.form_data.recruitment_id|default:"-" }}</span>
+            </div>
+            
+            {% if registration_data.form_data.city or registration_data.form_data.state %}
+            <div class="info-row">
+                <span class="info-label">{% trans "Location:" %}</span>
+                <span class="info-value">
+                    {% if registration_data.form_data.city %}{{ registration_data.form_data.city }}{% endif %}
+                    {% if registration_data.form_data.city and registration_data.form_data.state %}, {% endif %}
+                    {% if registration_data.form_data.state %}{{ registration_data.form_data.state }}{% endif %}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <a href="{% url 'candidate-registration-pdf' %}" class="btn btn-primary" target="_blank">
+                <i class="fas fa-file-pdf pdf-icon"></i>
+                {% trans "Generate PDF" %}
+            </a>
+            
+            <a href="{% url 'candidate-register' %}" class="btn btn-secondary">
+                <i class="fas fa-plus" style="margin-right: 8px;"></i>
+                {% trans "Register Another Candidate" %}
+            </a>
+            
+            <a href="{% url 'candidate-view' %}" class="btn btn-secondary">
+                <i class="fas fa-list" style="margin-right: 8px;"></i>
+                {% trans "View All Candidates" %}
+            </a>
+        </div>
+        
+        <!-- Additional Information -->
+        <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #e9ecef;">
+            <p style="color: #6c757d; font-size: 14px; line-height: 1.6;">
+                <i class="fas fa-info-circle" style="color: #17a2b8; margin-right: 5px;"></i>
+                {% trans "Your application has been saved in our system. Our recruitment team will review your application and contact you if there's a suitable opportunity. The PDF copy contains all the information you provided during registration." %}
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Add some animation effects
+    $('.success-container').hide().fadeIn(800);
+    
+    // Auto-scroll to top
+    $('html, body').animate({scrollTop: 0}, 600);
+    
+    // Add hover effects to buttons
+    $('.action-buttons .btn').hover(
+        function() {
+            $(this).css('transform', 'translateY(-2px)');
+        },
+        function() {
+            $(this).css('transform', 'translateY(0)');
+        }
+    );
+    
+    // Show a toast message
+    setTimeout(function() {
+        if (typeof toastr !== 'undefined') {
+            toastr.success('{% trans "Registration completed successfully!" %}', '{% trans "Success" %}');
+        }
+    }, 1000);
+});
+</script>
+{% endblock content %} 

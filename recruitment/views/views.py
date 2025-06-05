@@ -97,6 +97,7 @@ from recruitment.forms import (
     StageNoteForm,
     StageNoteUpdateForm,
     ToSkillZoneForm,
+    CandidateRegistrationForm,
 )
 from recruitment.methods import recruitment_manages
 from recruitment.models import (
@@ -115,6 +116,7 @@ from recruitment.models import (
     Stage,
     StageFiles,
     StageNote,
+    ParsedResumeDetails,
 )
 from recruitment.views.paginator_qry import paginator_qry
 from recruitment.methods import parse_resume_with_groq
@@ -3579,3 +3581,1145 @@ def employee_profile_interview_tab(request):
     ).order_by("is_today", "-interview_date", "interview_time")
 
     return render(request, "tabs/scheduled_interview.html", {"interviews": interviews})
+
+
+@login_required
+@permission_required(perm="recruitment.add_candidate")
+def candidate_register(request):
+    """
+    This method is used for comprehensive candidate registration with resume parsing
+    """
+    from recruitment.forms import CandidateRegistrationForm
+    from recruitment.methods import parse_resume_with_groq
+    from recruitment.models import ParsedResumeDetails
+    import json
+    
+    form = CandidateRegistrationForm()
+    open_recruitment = Recruitment.objects.filter(closed=False, is_active=True)
+    parsed_data = {}
+    
+    if request.method == "POST":
+        form = CandidateRegistrationForm(request.POST, request.FILES)
+        if form.is_valid():
+            # Save the candidate
+            candidate_obj = form.save(commit=False)
+            candidate_obj.start_onboard = False
+            candidate_obj.source = "application"
+            
+            if candidate_obj.stage_id is None:
+                candidate_obj.stage_id = Stage.objects.filter(
+                    recruitment_id=candidate_obj.recruitment_id, stage_type="initial"
+                ).first()
+            
+            # Save the candidate first
+            candidate_obj.save()
+            
+            # Parse resume if uploaded
+            if candidate_obj.resume:
+                try:
+                    import PyPDF2
+                    pdf_file = candidate_obj.resume
+                    
+                    # Extract text from PDF
+                    pdf_reader = PyPDF2.PdfReader(pdf_file)
+                    text = ""
+                    for page in pdf_reader.pages:
+                        text += page.extract_text()
+                    
+                    # Parse with Groq
+                    if text.strip():
+                        parsed_details = parse_resume_with_groq(text)
+                        if parsed_details:
+                            # Create ParsedResumeDetails entry
+                            ParsedResumeDetails.objects.create(
+                                candidate=candidate_obj,
+                                education=parsed_details.get("education"),
+                                skills=parsed_details.get("skills"),
+                                experience=parsed_details.get("experience"),
+                                certifications=parsed_details.get("certifications"),
+                                summary=parsed_details.get("summary"),
+                                llm_model="meta-llama/llama-4-scout-17b-16e-instruct",
+                                raw_json=parsed_details,
+                            )
+                            
+                except Exception as e:
+                    logger.warning(f"Resume parsing failed: {e}")
+            
+            # Store additional form data in a JSON field or separate model if needed
+            additional_data = {
+                'home_phone': form.cleaned_data.get('home_phone'),
+                'work_phone': form.cleaned_data.get('work_phone'),
+                'preferred_contact_method': form.cleaned_data.get('preferred_contact_method'),
+                'preferred_contact_time': form.cleaned_data.get('preferred_contact_time'),
+                'education_degree': form.cleaned_data.get('education_degree'),
+                'licensure_type': form.cleaned_data.get('licensure_type'),
+                'license_number': form.cleaned_data.get('license_number'),
+                'license_state': form.cleaned_data.get('license_state'),
+                'certifications': form.cleaned_data.get('certifications'),
+                'other_certification': form.cleaned_data.get('other_certification'),
+                'clinical_criteria': form.cleaned_data.get('clinical_criteria'),
+                'other_clinical': form.cleaned_data.get('other_clinical'),
+                'computer_skills': form.cleaned_data.get('computer_skills'),
+                'other_computer_skills': form.cleaned_data.get('other_computer_skills'),
+                'medical_coding': form.cleaned_data.get('medical_coding'),
+                'other_medical_coding': form.cleaned_data.get('other_medical_coding'),
+                'clinical_specialties': form.cleaned_data.get('clinical_specialties'),
+                'other_skills_experience': form.cleaned_data.get('other_skills_experience'),
+                'preferred_schedule': form.cleaned_data.get('preferred_schedule'),
+                'work_description': form.cleaned_data.get('work_description'),
+                'how_heard_about_psn': form.cleaned_data.get('how_heard_about_psn'),
+                'personal_referral_name': form.cleaned_data.get('personal_referral_name'),
+                'previous_psn_application': form.cleaned_data.get('previous_psn_application'),
+                'license_action_taken': form.cleaned_data.get('license_action_taken'),
+                'background_check_consent': form.cleaned_data.get('background_check_consent'),
+                'confidentiality_agreement': form.cleaned_data.get('confidentiality_agreement'),
+                'employment_at_will': form.cleaned_data.get('employment_at_will'),
+                'reference1_name': form.cleaned_data.get('reference1_name'),
+                'reference1_phone': form.cleaned_data.get('reference1_phone'),
+                'reference1_company': form.cleaned_data.get('reference1_company'),
+                'reference1_position': form.cleaned_data.get('reference1_position'),
+                'reference1_dates': form.cleaned_data.get('reference1_dates'),
+                'reference1_type': form.cleaned_data.get('reference1_type'),
+                'reference2_name': form.cleaned_data.get('reference2_name'),
+                'reference2_phone': form.cleaned_data.get('reference2_phone'),
+                'reference2_company': form.cleaned_data.get('reference2_company'),
+                'reference2_position': form.cleaned_data.get('reference2_position'),
+                'reference2_dates': form.cleaned_data.get('reference2_dates'),
+                'reference2_type': form.cleaned_data.get('reference2_type'),
+            }
+            
+            # Save additional data - you could extend the Candidate model or create a separate model
+            # For now, we'll store it in session or as a note
+            try:
+                note_description = f"Additional Registration Data: {json.dumps(additional_data, indent=2)}"
+                StageNote.objects.create(
+                    candidate_id=candidate_obj,
+                    stage_id=candidate_obj.stage_id,
+                    description=note_description,
+                    updated_by=request.user.employee_get,
+                    candidate_can_view=False
+                )
+            except Exception as e:
+                logger.warning(f"Failed to save additional data: {e}")
+            
+            messages.success(request, _("Candidate registered successfully."))
+            
+            # Store registration data in session for PDF generation
+            request.session['registration_data'] = {
+                'candidate_id': candidate_obj.id,
+                'form_data': {
+                    'name': candidate_obj.name,
+                    'email': candidate_obj.email,
+                    'mobile': candidate_obj.mobile,
+                    'address': candidate_obj.address,
+                    'city': candidate_obj.city,
+                    'state': candidate_obj.state,
+                    'zip': candidate_obj.zip,
+                    'country': candidate_obj.country,
+                    'dob': str(candidate_obj.dob) if candidate_obj.dob else None,
+                    'gender': candidate_obj.gender,
+                    'portfolio': candidate_obj.portfolio,
+                    'recruitment_id': str(candidate_obj.recruitment_id),
+                    'job_position_id': str(candidate_obj.job_position_id),
+                    'referral': str(candidate_obj.referral) if candidate_obj.referral else None,
+                },
+                'additional_fields': additional_data
+            }
+            
+            return redirect('candidate-registration-success')
+    
+    return render(
+        request,
+        "candidate/candidate_register_form.html",
+        {
+            "form": form, 
+            "open_recruitment": open_recruitment,
+            "parsed_data": parsed_data
+        },
+    )
+
+
+@login_required
+@permission_required(perm="recruitment.add_candidate")
+def parse_resume_ajax(request):
+    """
+    AJAX endpoint for parsing resume files and auto-populating form fields
+    """
+    if request.method == 'POST' and request.FILES.get('resume'):
+        try:
+            import PyPDF2
+            from recruitment.methods import parse_resume_with_groq
+            
+            resume_file = request.FILES['resume']
+            
+            # Extract text from PDF
+            pdf_reader = PyPDF2.PdfReader(resume_file)
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text()
+            
+            if text.strip():
+                # Create a custom prompt for form field extraction
+                form_fields_prompt = """
+                Extract the following information from this resume and return it as a JSON object.
+                If any information is not found, use null for that field.
+                Make sure that the output is a valid JSON object since it will be parsed directly.
+                
+                Required fields:
+                - name: Full name of the person
+                - email: Email address
+                - mobile: Phone number (cell/mobile)
+                - home_phone: Home phone number
+                - work_phone: Work phone number
+                - address: Full address
+                - city: City name
+                - state: State name
+                - zip: Zip code
+                - country: Country name
+                - portfolio: Website/portfolio URL
+                - education_degree: Highest degree (hospital_diploma, associate, bachelor, master, doctorate)
+                - licensure_type: Professional license type (rn, lpn, md, sw, other)
+                - license_number: License number
+                - license_state: State where license was issued
+                - certifications: List of certifications (ccm, cpho, chm, cpur, cphm, coding, other_cert)
+                - other_certification: Any other certifications not in the list above
+                - clinical_criteria: Clinical criteria experience (interqual, milliman, other_clinical)
+                - other_clinical: Other clinical criteria not listed above
+                - computer_skills: Computer skills (ms_excel, ms_word, ms_access, other_computer)
+                - other_computer_skills: Other computer skills not listed above
+                - medical_coding: Medical coding experience (icd_10, hcpc, cpt, other_coding)
+                - other_medical_coding: Other medical coding not listed above
+                - clinical_specialties: Clinical specialties text
+                - other_skills_experience: Other applicable skills/experience
+                - preferred_schedule: Work preference (full_time, part_time, direct_hire, temporary)
+                - work_description: Description of desired work/setting
+                - reference1_name: First reference name
+                - reference1_phone: First reference phone
+                - reference1_company: First reference company
+                - reference1_position: First reference position
+                - reference2_name: Second reference name
+                - reference2_phone: Second reference phone
+                - reference2_company: Second reference company
+                - reference2_position: Second reference position
+                
+                Resume text:
+                """ + text
+                
+                # Use the existing groq parsing method but with our custom prompt
+                try:
+                    from groq import Groq
+                    import os
+                    
+                    api_key = os.environ.get("GROQ_API_KEY")
+                    if not api_key:
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'GROQ_API_KEY environment variable not set'
+                        })
+                    
+                    client = Groq(api_key=api_key)
+                    
+                    completion = client.chat.completions.create(
+                        model="llama3-70b-8192",
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": form_fields_prompt
+                            }
+                        ],
+                        temperature=0.1,
+                    )
+                    
+                    response_content = completion.choices[0].message.content.strip()
+                    
+                    # Debug logging to see raw response
+                    logger.info(f"Raw Groq response: {response_content[:500]}...")  # Log first 500 chars
+                    
+                    # Clean up the response to extract JSON
+                    if "```json" in response_content:
+                        json_start = response_content.find("```json") + 7
+                        json_end = response_content.find("```", json_start)
+                        response_content = response_content[json_start:json_end].strip()
+                    elif "```" in response_content:
+                        json_start = response_content.find("```") + 3
+                        json_end = response_content.rfind("```")
+                        response_content = response_content[json_start:json_end].strip()
+                    
+                    # Clean up control characters and common issues
+                    import re
+                    
+                    # Remove control characters except newlines and tabs
+                    response_content = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', response_content)
+                    
+                    # Fix common JSON issues
+                    response_content = response_content.replace('\n', ' ')
+                    response_content = response_content.replace('\t', ' ')
+                    response_content = re.sub(r'\s+', ' ', response_content)  # Multiple spaces to single
+                    response_content = response_content.strip()
+                    
+                    # Try to find JSON object boundaries if malformed
+                    if not response_content.startswith('{'):
+                        json_match = re.search(r'\{.*\}', response_content, re.DOTALL)
+                        if json_match:
+                            response_content = json_match.group()
+                    
+                    try:
+                        import json
+                        parsed_data = json.loads(response_content)
+                        
+                        # Validate that it's a dictionary with expected structure
+                        if not isinstance(parsed_data, dict):
+                            raise ValueError("Response is not a dictionary")
+                            
+                        return JsonResponse({
+                            'success': True,
+                            'data': parsed_data
+                        })
+                        
+                    except (json.JSONDecodeError, ValueError) as json_error:
+                        # If JSON parsing fails, try to extract key-value pairs manually
+                        logger.warning(f"JSON parsing failed: {json_error}. Attempting manual parsing.")
+                        
+                        # Fallback: try to extract basic information using regex
+                        fallback_data = {}
+                        
+                        # Extract common fields using regex patterns
+                        patterns = {
+                            'name': r'"name"\s*:\s*"([^"]*)"',
+                            'email': r'"email"\s*:\s*"([^"]*)"',
+                            'mobile': r'"mobile"\s*:\s*"([^"]*)"',
+                            'phone': r'"phone"\s*:\s*"([^"]*)"',
+                            'address': r'"address"\s*:\s*"([^"]*)"',
+                            'city': r'"city"\s*:\s*"([^"]*)"',
+                            'state': r'"state"\s*:\s*"([^"]*)"',
+                            'zip': r'"zip"\s*:\s*"([^"]*)"',
+                            'education_degree': r'"education_degree"\s*:\s*"([^"]*)"',
+                            'licensure_type': r'"licensure_type"\s*:\s*"([^"]*)"',
+                            'license_number': r'"license_number"\s*:\s*"([^"]*)"',
+                        }
+                        
+                        for field, pattern in patterns.items():
+                            match = re.search(pattern, response_content, re.IGNORECASE)
+                            if match:
+                                fallback_data[field] = match.group(1)
+                        
+                        if fallback_data:
+                            return JsonResponse({
+                                'success': True,
+                                'data': fallback_data,
+                                'warning': 'Partial data extracted due to parsing issues'
+                            })
+                        else:
+                            return JsonResponse({
+                                'success': False,
+                                'error': f'Failed to parse response: {str(json_error)}'
+                            })
+                
+                except Exception as groq_error:
+                    logger.error(f"Error with Groq API: {groq_error}")
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Error parsing resume with Groq: {str(groq_error)}'
+                    })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Could not extract text from PDF'
+                })
+                
+        except Exception as e:
+            logger.error(f"Error processing resume: {e}")
+            return JsonResponse({
+                'success': False,
+                'error': f'Error processing file: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'error': 'Invalid request'
+    })
+
+
+@login_required
+@permission_required(perm="recruitment.add_candidate")
+def candidate_registration_success(request):
+    """
+    Success page after candidate registration
+    """
+    registration_data = request.session.get('registration_data')
+    
+    if not registration_data:
+        messages.error(request, _("No registration data found."))
+        return redirect('candidate-register')
+    
+    context = {
+        'registration_data': registration_data,
+        'candidate_id': registration_data.get('candidate_id')
+    }
+    
+    return render(request, 'candidate/registration_success.html', context)
+
+
+@login_required  
+@permission_required(perm="recruitment.add_candidate")
+def candidate_registration_pdf(request):
+    """
+    Generate PDF of candidate registration
+    """
+    from django.http import HttpResponse
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib import colors
+    from io import BytesIO
+    import json
+    
+    registration_data = request.session.get('registration_data')
+    
+    if not registration_data:
+        messages.error(request, _("No registration data found."))
+        return redirect('candidate-register')
+    
+    # Create the PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, 
+                           topMargin=72, bottomMargin=18)
+    
+    # Get styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        spaceAfter=30,
+        alignment=1,  # Center alignment
+        textColor=colors.darkblue
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        spaceAfter=12,
+        textColor=colors.darkblue,
+        backColor=colors.lightgrey,
+        borderPadding=5
+    )
+    
+    # Story list to hold the flowables
+    story = []
+    
+    # Title
+    story.append(Paragraph("CANDIDATE REGISTRATION FORM", title_style))
+    story.append(Spacer(1, 12))
+    
+    form_data = registration_data.get('form_data', {})
+    additional_fields = registration_data.get('additional_fields', {})
+    
+    # Personal Information Section
+    story.append(Paragraph("Personal Information", heading_style))
+    story.append(Spacer(1, 6))
+    
+    personal_data = [
+        ['Full Name:', form_data.get('name', '')],
+        ['Email:', form_data.get('email', '')],
+        ['Cell Phone:', form_data.get('mobile', '')],
+        ['Home Phone:', additional_fields.get('home_phone', '')],
+        ['Work Phone:', additional_fields.get('work_phone', '')],
+        ['Date of Birth:', form_data.get('dob', '')],
+        ['Gender:', form_data.get('gender', '')],
+        ['Address:', form_data.get('address', '')],
+        ['City:', form_data.get('city', '')],
+        ['State:', form_data.get('state', '')],
+        ['Zip Code:', form_data.get('zip', '')],
+        ['Country:', form_data.get('country', '')],
+        ['Portfolio:', form_data.get('portfolio', '')],
+    ]
+    
+    personal_table = Table(personal_data, colWidths=[2*inch, 4*inch])
+    personal_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.lightgrey]),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(personal_table)
+    story.append(Spacer(1, 20))
+    
+    # Contact Preferences
+    story.append(Paragraph("Contact Preferences", heading_style))
+    story.append(Spacer(1, 6))
+    
+    contact_data = [
+        ['Preferred Contact Method:', additional_fields.get('preferred_contact_method', '')],
+        ['Preferred Contact Time:', additional_fields.get('preferred_contact_time', '')],
+    ]
+    
+    contact_table = Table(contact_data, colWidths=[2*inch, 4*inch])
+    contact_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.lightgrey]),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(contact_table)
+    story.append(Spacer(1, 20))
+    
+    # Education & Licensure
+    story.append(Paragraph("Education & Licensure", heading_style))
+    story.append(Spacer(1, 6))
+    
+    education_data = [
+        ['Education Degree:', additional_fields.get('education_degree', '')],
+        ['Licensure Type:', additional_fields.get('licensure_type', '')],
+        ['License Number:', additional_fields.get('license_number', '')],
+        ['License State:', additional_fields.get('license_state', '')],
+    ]
+    
+    education_table = Table(education_data, colWidths=[2*inch, 4*inch])
+    education_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.lightgrey]),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(education_table)
+    story.append(Spacer(1, 20))
+    
+    # Skills & Experience
+    story.append(Paragraph("Skills & Experience", heading_style))
+    story.append(Spacer(1, 6))
+    
+    # Convert lists to readable format
+    certifications = additional_fields.get('certifications', [])
+    if isinstance(certifications, list):
+        certifications_str = ', '.join(certifications)
+    else:
+        certifications_str = str(certifications) if certifications else ''
+        
+    clinical_criteria = additional_fields.get('clinical_criteria', [])
+    if isinstance(clinical_criteria, list):
+        clinical_criteria_str = ', '.join(clinical_criteria)
+    else:
+        clinical_criteria_str = str(clinical_criteria) if clinical_criteria else ''
+        
+    computer_skills = additional_fields.get('computer_skills', [])
+    if isinstance(computer_skills, list):
+        computer_skills_str = ', '.join(computer_skills)
+    else:
+        computer_skills_str = str(computer_skills) if computer_skills else ''
+        
+    medical_coding = additional_fields.get('medical_coding', [])
+    if isinstance(medical_coding, list):
+        medical_coding_str = ', '.join(medical_coding)
+    else:
+        medical_coding_str = str(medical_coding) if medical_coding else ''
+    
+    skills_data = [
+        ['Certifications:', certifications_str],
+        ['Other Certifications:', additional_fields.get('other_certification', '')],
+        ['Clinical Criteria:', clinical_criteria_str],
+        ['Other Clinical:', additional_fields.get('other_clinical', '')],
+        ['Computer Skills:', computer_skills_str],
+        ['Other Computer Skills:', additional_fields.get('other_computer_skills', '')],
+        ['Medical Coding:', medical_coding_str],
+        ['Other Medical Coding:', additional_fields.get('other_medical_coding', '')],
+        ['Clinical Specialties:', additional_fields.get('clinical_specialties', '')],
+        ['Other Skills/Experience:', additional_fields.get('other_skills_experience', '')],
+    ]
+    
+    skills_table = Table(skills_data, colWidths=[2*inch, 4*inch])
+    skills_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.lightgrey]),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(skills_table)
+    story.append(Spacer(1, 20))
+    
+    # Work Preferences
+    story.append(Paragraph("Work Preferences", heading_style))
+    story.append(Spacer(1, 6))
+    
+    preferred_schedule = additional_fields.get('preferred_schedule', [])
+    if isinstance(preferred_schedule, list):
+        preferred_schedule_str = ', '.join(preferred_schedule)
+    else:
+        preferred_schedule_str = str(preferred_schedule) if preferred_schedule else ''
+    
+    work_data = [
+        ['Preferred Schedule:', preferred_schedule_str],
+        ['Work Description:', additional_fields.get('work_description', '')],
+        ['How heard about PSN:', additional_fields.get('how_heard_about_psn', '')],
+        ['Personal Referral:', additional_fields.get('personal_referral_name', '')],
+    ]
+    
+    work_table = Table(work_data, colWidths=[2*inch, 4*inch])
+    work_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.lightgrey]),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(work_table)
+    story.append(Spacer(1, 20))
+    
+    # References
+    story.append(Paragraph("References", heading_style))
+    story.append(Spacer(1, 6))
+    
+    references_data = [
+        ['Reference 1 Name:', additional_fields.get('reference1_name', '')],
+        ['Reference 1 Phone:', additional_fields.get('reference1_phone', '')],
+        ['Reference 1 Company:', additional_fields.get('reference1_company', '')],
+        ['Reference 1 Position:', additional_fields.get('reference1_position', '')],
+        ['Reference 1 Work Dates:', additional_fields.get('reference1_dates', '')],
+        ['Reference 1 Type:', additional_fields.get('reference1_type', '')],
+        ['', ''],  # Spacer row
+        ['Reference 2 Name:', additional_fields.get('reference2_name', '')],
+        ['Reference 2 Phone:', additional_fields.get('reference2_phone', '')],
+        ['Reference 2 Company:', additional_fields.get('reference2_company', '')],
+        ['Reference 2 Position:', additional_fields.get('reference2_position', '')],
+        ['Reference 2 Work Dates:', additional_fields.get('reference2_dates', '')],
+        ['Reference 2 Type:', additional_fields.get('reference2_type', '')],
+    ]
+    
+    references_table = Table(references_data, colWidths=[2*inch, 4*inch])
+    references_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.lightgrey]),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(references_table)
+    story.append(Spacer(1, 20))
+    
+    # Agreements
+    story.append(Paragraph("Agreements", heading_style))
+    story.append(Spacer(1, 6))
+    
+    agreements_data = [
+        ['Previous PSN Application:', 'Yes' if additional_fields.get('previous_psn_application') else 'No'],
+        ['License Action Taken:', 'Yes' if additional_fields.get('license_action_taken') else 'No'],
+        ['Background Check Consent:', 'Yes' if additional_fields.get('background_check_consent') else 'No'],
+        ['Confidentiality Agreement:', 'Yes' if additional_fields.get('confidentiality_agreement') else 'No'],
+        ['Employment at Will:', 'Yes' if additional_fields.get('employment_at_will') else 'No'],
+    ]
+    
+    agreements_table = Table(agreements_data, colWidths=[2*inch, 4*inch])
+    agreements_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.lightgrey]),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(agreements_table)
+    
+    # Build PDF
+    doc.build(story)
+    
+    # Get the value of the BytesIO buffer and write it to the response
+    pdf = buffer.getvalue()
+    buffer.close()
+    
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="candidate_registration_{form_data.get("name", "unknown")}.pdf"'
+    response.write(pdf)
+    
+    return response
+
+def candidate_registration_pdf_psn_format(request):
+    """
+    Generate PDF of candidate registration in PSN application form format
+    """
+    from django.http import HttpResponse
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib import colors
+    from reportlab.pdfgen import canvas
+    from io import BytesIO
+    import json
+    import os
+    
+    registration_data = request.session.get('registration_data')
+    
+    if not registration_data:
+        messages.error(request, _("No registration data found."))
+        return redirect('candidate-register')
+    
+    # Create the PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, 
+                           topMargin=50, bottomMargin=50)
+    
+    # Get styles
+    styles = getSampleStyleSheet()
+    
+    # Custom styles to match PSN format
+    header_style = ParagraphStyle(
+        'PSNHeader',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=1,  # Center alignment
+        textColor=colors.black,
+        spaceAfter=6
+    )
+    
+    title_style = ParagraphStyle(
+        'PSNTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        spaceAfter=20,
+        alignment=1,  # Center alignment
+        textColor=colors.black,
+        fontName='Helvetica-Bold'
+    )
+    
+    section_style = ParagraphStyle(
+        'PSNSection',
+        parent=styles['Heading2'],
+        fontSize=12,
+        spaceAfter=10,
+        textColor=colors.white,
+        backColor=colors.Color(0.7, 0.8, 0.9),  # Light blue background
+        borderPadding=8,
+        fontName='Helvetica-Bold',
+        alignment=1
+    )
+    
+    label_style = ParagraphStyle(
+        'PSNLabel',
+        parent=styles['Normal'],
+        fontSize=10,
+        fontName='Helvetica-Bold'
+    )
+    
+    normal_style = ParagraphStyle(
+        'PSNNormal',
+        parent=styles['Normal'],
+        fontSize=10
+    )
+    
+    # Story list to hold the flowables
+    story = []
+    
+    form_data = registration_data.get('form_data', {})
+    additional_fields = registration_data.get('additional_fields', {})
+    
+    # Header with company info - create a table to mimic the original layout
+    from reportlab.platypus import Image
+    
+    # Create header table to match original layout
+    header_data = [
+        ["", "Specialists in Healthcare Recruitment & Staffing and", ""],
+        ["", "Accreditation Preparation Services since 1990", ""],
+        ["", "", ""],
+        ["402 King Farm Blvd., Suite 125-142", "⚫", "Rockville, MD 20850", "⚫", "Ph: 301-460-4089"]
+    ]
+    
+    # If you have the logo file saved locally, you can use it like this:
+    logo_path = "psn_logo.png"  # Update with actual path
+    if os.path.exists(logo_path):
+        logo = Image(logo_path, width=60, height=60)
+        header_data[0][0] = logo
+    
+    header_table = Table(header_data, colWidths=[1*inch, 3*inch, 1*inch, 0.3*inch, 1.7*inch])
+    header_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (1, 0), (1, 1), 'Helvetica-Bold'),
+        ('FONTSIZE', (1, 0), (1, 1), 10),
+        ('FONTSIZE', (0, 3), (-1, 3), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('SPAN', (1, 0), (1, 0)),  # Span the title across
+        ('SPAN', (1, 1), (1, 1)),  # Span the subtitle across
+    ]))
+    
+    story.append(header_table)
+    story.append(Spacer(1, 20))
+    
+    # Title
+    story.append(Paragraph("APPLICANT INFORMATION FORM", title_style))
+    story.append(Spacer(1, 10))
+    
+    # Company description
+    desc_text = ("PSN is a woman-owned, nurse-owned staffing and recruitment company celebrating 30 years in business this year! "
+                "We specialize in recruiting experienced nurses and other healthcare professionals for managed care-related positions in "
+                "insurance, hospital, and managed care settings. There is never a cost to individuals. Our fees are paid by our client "
+                "companies. We look forward to the opportunity to work with you.")
+    story.append(Paragraph(desc_text, normal_style))
+    story.append(Spacer(1, 20))
+    
+    # GENERAL INFORMATION Section
+    story.append(Paragraph("GENERAL INFORMATION", section_style))
+    story.append(Spacer(1, 10))
+    
+    # Create form-like fields for general information
+    general_fields = [
+        f"Name: {form_data.get('name', '_' * 50)}",
+        f"Address: {form_data.get('address', '_' * 50)}",
+        f"City: {form_data.get('city', '_' * 20)} State: {form_data.get('state', '_' * 10)} Zip Code: {form_data.get('zip', '_' * 10)}",
+        f"Cell Phone: {form_data.get('mobile', '_' * 15)} Home Phone: {additional_fields.get('home_phone', '_' * 15)} Work Phone: {additional_fields.get('work_phone', '_' * 15)}",
+        f"Email Address: {form_data.get('email', '_' * 40)}",
+        f"Best way to contact you: {additional_fields.get('preferred_contact_method', '_' * 20)} Preferred time of day: {additional_fields.get('preferred_contact_time', '_' * 20)}"
+    ]
+    
+    for field in general_fields:
+        story.append(Paragraph(field, normal_style))
+        story.append(Spacer(1, 8))
+    
+    story.append(Spacer(1, 20))
+    
+    # EDUCATION / LICENSURE / CERTIFICATIONS Section
+    story.append(Paragraph("EDUCATION / LICENSURE / CERTIFICATIONS", section_style))
+    story.append(Spacer(1, 10))
+    
+    # DEGREE subsection
+    story.append(Paragraph("DEGREE", label_style))
+    story.append(Spacer(1, 5))
+    
+    # Create checkbox-like display for degrees - fix value mapping
+    degree = additional_fields.get('education_degree', '')
+    degree_mapping = {
+        'hospital_diploma': 'Hospital Diploma',
+        'associate': 'Associate Degree',
+        'bachelor': "Bachelor's Degree",
+        'master': "Master's Degree",
+        'doctorate': 'Doctorate Degree'
+    }
+    degree_options = ['Hospital Diploma', 'Associate Degree', "Bachelor's Degree", "Master's Degree", "Doctorate Degree"]
+    degree_text = ""
+    for option in degree_options:
+        # Check if this option matches the stored degree value
+        is_selected = degree_mapping.get(degree, '') == option
+        checked = "[X]" if is_selected else "[ ]"
+        degree_text += f"{checked} {option}    "
+    story.append(Paragraph(degree_text, normal_style))
+    story.append(Spacer(1, 15))
+    
+    # LICENSURE subsection
+    story.append(Paragraph("LICENSURE", label_style))
+    story.append(Spacer(1, 5))
+    
+    # Fix licensure type mapping
+    licensure_type = additional_fields.get('licensure_type', '')
+    licensure_mapping = {
+        'rn': 'RN',
+        'lpn': 'LPN',
+        'md': 'MD',
+        'sw': 'SW',
+        'other': 'Other'
+    }
+    license_options = ['RN', 'LPN', 'MD', 'SW', 'Other']
+    license_text = ""
+    for option in license_options:
+        # Check if this option matches the stored licensure value
+        is_selected = licensure_mapping.get(licensure_type, '') == option
+        checked = "[X]" if is_selected else "[ ]"
+        license_text += f"{checked} {option}    "
+    story.append(Paragraph(license_text, normal_style))
+    story.append(Spacer(1, 8))
+    
+    story.append(Paragraph(f"License Number/s: {additional_fields.get('license_number', '_' * 40)}", normal_style))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph(f"State/s: {additional_fields.get('license_state', '_' * 40)}", normal_style))
+    story.append(Spacer(1, 15))
+    
+    # CERTIFICATIONS subsection
+    story.append(Paragraph("CERTIFICATIONS", label_style))
+    story.append(Spacer(1, 5))
+    
+    # Fix certifications mapping
+    certifications = additional_fields.get('certifications', [])
+    if isinstance(certifications, str):
+        certifications = [certifications] if certifications else []
+    
+    cert_mapping = {
+        'ccm': 'CCM',
+        'cpho': 'CPHO',  # Note: form has 'cpho'
+        'chm': 'CHM',
+        'cpur': 'CPUR',
+        'cphm': 'CPHM',
+        'coding': 'Coding'
+    }
+    cert_options = ['CCM', 'CPHO', 'CHM', 'CPUR', 'CPHM', 'Coding']
+    cert_text = ""
+    for option in cert_options:
+        # Check if any stored certification maps to this display option
+        is_selected = any(cert_mapping.get(cert, '') == option for cert in certifications)
+        checked = "[X]" if is_selected else "[ ]"
+        cert_text += f"{checked} {option}    "
+    story.append(Paragraph(cert_text, normal_style))
+    story.append(Spacer(1, 8))
+    
+    other_cert = additional_fields.get('other_certification', '')
+    story.append(Paragraph(f"Other: {other_cert if other_cert else '_' * 40}", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # SKILLS AND EXPERIENCE Section
+    story.append(Paragraph("SKILLS AND EXPERIENCE", section_style))
+    story.append(Spacer(1, 10))
+    
+    # CLINICAL CRITERIA - fix mapping
+    story.append(Paragraph("CLINICAL CRITERIA", label_style))
+    story.append(Spacer(1, 5))
+    
+    clinical_criteria = additional_fields.get('clinical_criteria', [])
+    if isinstance(clinical_criteria, str):
+        clinical_criteria = [clinical_criteria] if clinical_criteria else []
+    
+    clinical_mapping = {
+        'interqual': 'InterQual',
+        'milliman': 'Milliman'
+    }
+    clinical_options = ['InterQual', 'Milliman']
+    clinical_text = ""
+    for option in clinical_options:
+        is_selected = any(clinical_mapping.get(crit, '') == option for crit in clinical_criteria)
+        checked = "[X]" if is_selected else "[ ]"
+        clinical_text += f"{checked} {option}    "
+    clinical_text += f"[ ] Other: {additional_fields.get('other_clinical', '_' * 20)}"
+    story.append(Paragraph(clinical_text, normal_style))
+    story.append(Spacer(1, 15))
+    
+    # COMPUTER SKILLS - fix mapping
+    story.append(Paragraph("COMPUTER SKILLS", label_style))
+    story.append(Spacer(1, 5))
+    
+    computer_skills = additional_fields.get('computer_skills', [])
+    if isinstance(computer_skills, str):
+        computer_skills = [computer_skills] if computer_skills else []
+    
+    computer_mapping = {
+        'ms_excel': 'MS Excel',
+        'ms_word': 'MS Word',
+        'ms_access': 'MS Access'
+    }
+    computer_options = ['MS Excel', 'MS Word', 'MS Access']
+    computer_text = ""
+    for option in computer_options:
+        is_selected = any(computer_mapping.get(skill, '') == option for skill in computer_skills)
+        checked = "[X]" if is_selected else "[ ]"
+        computer_text += f"{checked} {option}    "
+    computer_text += f"[ ] Other: {additional_fields.get('other_computer_skills', '_' * 20)}"
+    story.append(Paragraph(computer_text, normal_style))
+    story.append(Spacer(1, 15))
+    
+    # MEDICAL CODING - fix mapping
+    story.append(Paragraph("MEDICAL CODING", label_style))
+    story.append(Spacer(1, 5))
+    
+    medical_coding = additional_fields.get('medical_coding', [])
+    if isinstance(medical_coding, str):
+        medical_coding = [medical_coding] if medical_coding else []
+    
+    coding_mapping = {
+        'icd_10': 'ICD-10',
+        'hcpc': 'HCPC',
+        'cpt': 'CPT'
+    }
+    coding_options = ['ICD-10', 'HCPC', 'CPT']
+    coding_text = ""
+    for option in coding_options:
+        is_selected = any(coding_mapping.get(code, '') == option for code in medical_coding)
+        checked = "[X]" if is_selected else "[ ]"
+        coding_text += f"{checked} {option}    "
+    coding_text += f"[ ] Other: {additional_fields.get('other_medical_coding', '_' * 20)}"
+    story.append(Paragraph(coding_text, normal_style))
+    story.append(Spacer(1, 15))
+    
+    # Clinical Specialty and Other Skills
+    story.append(Paragraph(f"Clinical Specialty(ies): {additional_fields.get('clinical_specialties', '_' * 50)}", normal_style))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph(f"Other applicable skills/experience: {additional_fields.get('other_skills_experience', '_' * 50)}", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # WORK DESIRED Section
+    story.append(Paragraph("WORK DESIRED", section_style))
+    story.append(Spacer(1, 10))
+    
+    # PREFERRED SCHEDULE - fix mapping
+    story.append(Paragraph("PREFERRED SCHEDULE", label_style))
+    story.append(Spacer(1, 5))
+    
+    preferred_schedule = additional_fields.get('preferred_schedule', [])
+    if isinstance(preferred_schedule, str):
+        preferred_schedule = [preferred_schedule] if preferred_schedule else []
+    
+    schedule_mapping = {
+        'full_time': 'Full-Time',
+        'part_time': 'Part-Time',
+        'direct_hire': 'Direct Hire',
+        'temporary': 'Temporary Assignment'
+    }
+    schedule_options = ['Full-Time', 'Part-Time', 'Direct Hire', 'Temporary Assignment']
+    schedule_text = ""
+    for option in schedule_options:
+        is_selected = any(schedule_mapping.get(sched, '') == option for sched in preferred_schedule)
+        checked = "[X]" if is_selected else "[ ]"
+        schedule_text += f"{checked} {option}    "
+    story.append(Paragraph(schedule_text, normal_style))
+    story.append(Spacer(1, 10))
+    
+    work_desc = additional_fields.get('work_description', '')
+    story.append(Paragraph("Please describe the kind of work/setting and geography you seek and/or list any Job Number(s) from our website (www.psninc.net) that interest you.", normal_style))
+    story.append(Spacer(1, 5))
+    story.append(Paragraph(work_desc if work_desc else '_' * 80, normal_style))
+    story.append(Spacer(1, 20))
+    
+    # WHERE DID YOU LEARN ABOUT PSN Section
+    story.append(Paragraph("WHERE DID YOU LEARN ABOUT PSN?", section_style))
+    story.append(Spacer(1, 10))
+    
+    story.append(Paragraph("SOURCE", label_style))
+    story.append(Spacer(1, 5))
+    
+    # Fix source mapping
+    how_heard = additional_fields.get('how_heard_about_psn', '')
+    source_mapping = {
+        'search_engine': 'Search engine (e.g., Google)',
+        'psn_website': 'PSN Website',
+        'indeed': 'Indeed',
+        'linkedin': 'LinkedIn'
+    }
+    source_options = ['Search engine (e.g., Google)', 'PSN Website', 'Indeed', 'LinkedIn']
+    source_text = ""
+    for option in source_options:
+        is_selected = source_mapping.get(how_heard, '') == option
+        checked = "[X]" if is_selected else "[ ]"
+        source_text += f"{checked} {option}    "
+    story.append(Paragraph(source_text, normal_style))
+    story.append(Spacer(1, 8))
+    
+    personal_ref = additional_fields.get('personal_referral_name', '')
+    personal_ref_selected = how_heard == 'personal_referral'
+    checked_personal = "[X]" if personal_ref_selected else "[ ]"
+    story.append(Paragraph(f"{checked_personal} Personal Referral - Name of person or source of referral: {personal_ref if personal_ref else '_' * 30}", normal_style))
+    
+    # Start new page for additional sections
+    story.append(PageBreak())
+    
+    # ADDITIONAL QUESTIONS Section
+    story.append(Paragraph("ADDITIONAL QUESTIONS*", section_style))
+    story.append(Spacer(1, 10))
+    
+    prev_app = additional_fields.get('previous_psn_application', False)
+    story.append(Paragraph("1. Have you ever before filled out an employment application for PSN? *", normal_style))
+    story.append(Spacer(1, 5))
+    story.append(Paragraph(f"[X] Yes    [ ] No" if prev_app else "[ ] Yes    [X] No", normal_style))
+    story.append(Spacer(1, 10))
+    
+    license_action = additional_fields.get('license_action_taken', False)
+    story.append(Paragraph("2. Have you ever had, or have pending, action taken against your professional license or certificate in any state of the United States? (Adverse action includes, but is not limited to: letter of warning, reprimand, denial, suspension, revocation, voluntary surrender, or cancellation of license)? *", normal_style))
+    story.append(Spacer(1, 5))
+    story.append(Paragraph(f"[X] Yes    [ ] No" if license_action else "[ ] Yes    [X] No", normal_style))
+    story.append(Spacer(1, 10))
+    
+    bg_check = additional_fields.get('background_check_consent', False)
+    story.append(Paragraph("3. Many of our clients require a criminal and/or educational background check, and for hospitals, drug screen, proof of immunizations, including hepatitis B, negative TB test (within 12 months), and/or a physical exam (within 12 months) in order to be considered for a temporary assignment at their office or hospital setting. Are you willing to undergo a criminal background check and drug screen and obtain the above health information if requested? *", normal_style))
+    story.append(Spacer(1, 5))
+    story.append(Paragraph(f"[X] Yes    [ ] No" if bg_check else "[ ] Yes    [X] No", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # CONFIDENTIALITY AGREEMENT Section
+    story.append(Paragraph("CONFIDENTIALITY AGREEMENT", section_style))
+    story.append(Spacer(1, 10))
+    
+    confidentiality_text = [
+        "1. I agree that I shall hold in strict confidence all information and materials provided to me during my interactions with Professional Services Network, Inc. (PSN) and its clients. This includes, but is not limited to, information such as employment openings, client information, and financial compensation. I understand that this information is proprietary and crucial to the success of PSN and its clients, and that it must not be communicated to any outside party without prior permission from PSN.",
+        
+        "2. I agree that I shall allow PSN to represent me for employment openings first discussed with me by PSN, and for which I have expressed an interest. I further agree to not self-submit for these employment openings or otherwise directly contact PSN clients, nor work with other recruiters on these specific employment openings.",
+        
+        "3. I agree that I shall immediately disclose to PSN any previous application or resume submission that I had or have with any company that is discussed with me. I understand that PSN may be unable to represent me to clients with whom I have a prior relationship.",
+        
+        "4. I agree that all materials or information created, assembled, distributed, or otherwise communicated to me, including but not limited to applications, descriptions, benefits, reports, criteria, or plans, are the sole property of PSN and/or its clients, and shall not be disclosed in any manner at any time with express permission from PSN and/or its clients.",
+        
+        "5. I acknowledge that any false, incomplete, or misleading information I provide on this form, in a resume, or in a pre-employment interview, will be grounds to deny my application or, if discovered later, for immediate dismissal from employment."
+    ]
+    
+    for text in confidentiality_text:
+        story.append(Paragraph(text, normal_style))
+        story.append(Spacer(1, 8))
+    
+    confidentiality_agree = additional_fields.get('confidentiality_agreement', False)
+    story.append(Paragraph(f"[X] I agree to this provision *" if confidentiality_agree else "[ ] I agree to this provision *", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # EMPLOYMENT AT-WILL PROVISION
+    story.append(Paragraph("EMPLOYMENT AT-WILL PROVISION", section_style))
+    story.append(Spacer(1, 10))
+    
+    at_will_text = "I acknowledge that this application is not meant to be a contract of employment and that my employment with PSN is AT WILL and may be terminated at any time with or without notice by either PSN or myself."
+    story.append(Paragraph(at_will_text, normal_style))
+    story.append(Spacer(1, 8))
+    
+    at_will_agree = additional_fields.get('employment_at_will', False)
+    story.append(Paragraph(f"[X] I Acknowledge" if at_will_agree else "[ ] I Acknowledge", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # REFERENCES Section
+    story.append(Paragraph("REFERENCES", section_style))
+    story.append(Spacer(1, 10))
+    
+    story.append(Paragraph("Please provide two references, preferably a Supervisor and a Professional. If not possible, please provide at least two Professional References.", normal_style))
+    story.append(Spacer(1, 5))
+    story.append(Paragraph("Your references will not be contacted until you have been offered AND accepted a position with PSN or one of its clients", normal_style))
+    story.append(Spacer(1, 15))
+    
+    # Reference 1 - fix mapping
+    ref1_type = additional_fields.get('reference1_type', '')
+    ref1_supervisor = ref1_type == 'supervisor'
+    ref1_professional = ref1_type == 'professional'
+    story.append(Paragraph(f"[X] Supervisor    [ ] Professional" if ref1_supervisor else "[ ] Supervisor    [X] Professional", normal_style))
+    story.append(Spacer(1, 5))
+    story.append(Paragraph(f"Name of Reference: {additional_fields.get('reference1_name', '_' * 30)} Phone/email: {additional_fields.get('reference1_phone', '_' * 20)}", normal_style))
+    story.append(Spacer(1, 5))
+    story.append(Paragraph(f"Company where you worked together: {additional_fields.get('reference1_company', '_' * 50)}", normal_style))
+    story.append(Spacer(1, 5))
+    story.append(Paragraph(f"Position of your reference at the time: {additional_fields.get('reference1_position', '_' * 50)}", normal_style))
+    story.append(Spacer(1, 5))
+    story.append(Paragraph(f"Dates you worked together: {additional_fields.get('reference1_dates', '_' * 30)}", normal_style))
+    story.append(Spacer(1, 15))
+    
+    # Reference 2 - fix mapping
+    ref2_type = additional_fields.get('reference2_type', '')
+    ref2_supervisor = ref2_type == 'supervisor'
+    ref2_professional = ref2_type == 'professional'
+    story.append(Paragraph(f"[X] Supervisor    [ ] Professional" if ref2_supervisor else "[ ] Supervisor    [X] Professional", normal_style))
+    story.append(Spacer(1, 5))
+    story.append(Paragraph(f"Name of Reference: {additional_fields.get('reference2_name', '_' * 30)} Phone/email: {additional_fields.get('reference2_phone', '_' * 20)}", normal_style))
+    story.append(Spacer(1, 5))
+    story.append(Paragraph(f"Company where you worked together: {additional_fields.get('reference2_company', '_' * 50)}", normal_style))
+    story.append(Spacer(1, 5))
+    story.append(Paragraph(f"Position of your reference at the time: {additional_fields.get('reference2_position', '_' * 50)}", normal_style))
+    story.append(Spacer(1, 5))
+    story.append(Paragraph(f"Dates you worked together: {additional_fields.get('reference2_dates', '_' * 30)}", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # Final signature section
+    story.append(Paragraph("I agree that the information I provided on this application and my resume are truthful to the best of my knowledge.", normal_style))
+    story.append(Spacer(1, 15))
+    story.append(Paragraph("Signature*: _________________________________ Date: _________________", normal_style))
+    
+    # Build PDF
+    doc.build(story)
+    
+    # Get the value of the BytesIO buffer and write it to the response
+    pdf = buffer.getvalue()
+    buffer.close()
+    
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="PSN_Application_{form_data.get("name", "unknown").replace(" ", "_")}.pdf"'
+    response.write(pdf)
+    
+    return response

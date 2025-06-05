@@ -99,8 +99,7 @@ class ModelForm(forms.ModelForm):
                 self.fields[field_name].widget.attrs.update(
                     {
                         "id": uuid.uuid4,
-                        "class": "oh-select oh-select-2 w-100",
-                        "style": "height:50px;",
+                        "class": "form-control w-100",
                     }
                 )
             elif isinstance(widget, (forms.Textarea)):
@@ -149,9 +148,9 @@ class RegistrationForm(forms.ModelForm):
                 label = ""
                 if field.label is not None:
                     label = _(field.label)
-                field.empty_label = _("---Choose {label}---").format(label=label)
+                field.empty_label = _(f"---Choose {label}---").format(label=label)
                 self.fields[field_name].widget.attrs.update(
-                    {"id": uuid.uuid4, "class": "oh-select-2 oh-select--sm w-100"}
+                    {"id": uuid.uuid4, "class": "form-control w-100"}
                 )
             elif isinstance(widget, (forms.TextInput)):
                 field.widget.attrs.update(
@@ -443,8 +442,6 @@ class CandidateCreationForm(ModelForm):
         recruitment: Recruitment = self.cleaned_data["recruitment_id"]
         if not resume and not recruitment.optional_resume:
             errors["resume"] = _("This field is required")
-        if not profile and not recruitment.optional_profile_image:
-            errors["profile"] = _("This field is required")
         if self.instance.name is not None:
             self.errors.pop("job_position_id", None)
             if (
@@ -519,19 +516,29 @@ class ApplicationForm(RegistrationForm):
             self.fields["profile"].required = False
 
     def clean(self, *args, **kwargs):
-        name = self.cleaned_data["name"]
+        name = self.cleaned_data.get("name", "")
         request = getattr(_thread_locals, "request", None)
 
         errors = {}
-        profile = self.cleaned_data["profile"]     
-        resume = self.cleaned_data["resume"]
-        recruitment: Recruitment = self.cleaned_data["recruitment_id"]
-        if not resume and not recruitment.optional_resume:
-            errors["resume"] = _("This field is required")
-        if not profile and not recruitment.optional_profile_image:
-            errors["profile"] = _("This field is required")
+        
+        # Validate name length
+        if name and len(name) > 100:
+            errors["name"] = _("Name cannot exceed 100 characters.")
+            
+        profile = self.cleaned_data.get("profile")     
+        resume = self.cleaned_data.get("resume")
+        recruitment: Recruitment = self.cleaned_data.get("recruitment_id")
+        
+        if recruitment:
+            if not resume and not recruitment.optional_resume:
+                errors["resume"] = _("This field is required")
+            # Profile image is now always optional - removed profile validation
+            # if not profile and not recruitment.optional_profile_image:
+            #     errors["profile"] = _("This field is required")
+                
         if errors:
             raise ValidationError(errors)
+            
         if (
             not profile
             and request
@@ -1570,3 +1577,488 @@ class ParsedResumeDetailsForm(forms.Form):
         parsed_details.save()
         
         return parsed_details
+
+
+class CandidateRegistrationForm(forms.Form):
+    """
+    Comprehensive form for candidate registration with all application fields
+    """
+    
+    # Basic Model Fields
+    name = forms.CharField(
+        max_length=100,
+        required=True,
+        label=_("Full Name"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Full Name'})
+    )
+    
+    email = forms.EmailField(
+        required=True,
+        label=_("Email Address"),
+        widget=forms.EmailInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Email Address'})
+    )
+    
+    mobile = forms.CharField(
+        max_length=15,
+        required=True,
+        label=_("Cell Phone"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Cell Phone'})
+    )
+    
+    portfolio = forms.URLField(
+        required=False,
+        label=_("Portfolio"),
+        widget=forms.URLInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Portfolio URL'})
+    )
+    
+    dob = forms.DateField(
+        required=False,
+        label=_("Date of Birth"),
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'oh-input w-100'})
+    )
+    
+    address = forms.CharField(
+        required=False,
+        label=_("Address"),
+        widget=forms.Textarea(attrs={'class': 'oh-input w-100', 'rows': 3, 'placeholder': 'Address'})
+    )
+    
+    country = forms.CharField(
+        max_length=50,
+        required=False,
+        label=_("Country"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Country'})
+    )
+    
+    state = forms.CharField(
+        max_length=50,
+        required=False,
+        label=_("State"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'State'})
+    )
+    
+    city = forms.CharField(
+        max_length=50,
+        required=False,
+        label=_("City"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'City'})
+    )
+    
+    zip = forms.CharField(
+        max_length=10,
+        required=False,
+        label=_("Zip Code"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Zip Code'})
+    )
+    
+    resume = forms.FileField(
+        required=False,
+        label=_("Resume"),
+        widget=forms.FileInput(attrs={'class': 'oh-input w-100', 'accept': '.pdf'})
+    )
+    
+    # Model Choice Fields - using empty_label parameter
+    recruitment_id = forms.ModelChoiceField(
+        queryset=Recruitment.objects.filter(is_active=True, closed=False, is_published=True),
+        required=True,
+        label=_("Recruitment"),
+        empty_label="---Choose Recruitment---",
+        widget=forms.Select()
+    )
+    
+    job_position_id = forms.ModelChoiceField(
+        queryset=JobPosition.objects.all(),
+        required=True,
+        label=_("Job Position"),
+        empty_label="---Choose Job Position---",
+        widget=forms.Select()
+    )
+    
+    referral = forms.ModelChoiceField(
+        queryset=None,  # Will be set in __init__
+        required=False,
+        label=_("Referral"),
+        empty_label="---Choose Referral---",
+        widget=forms.Select()
+    )
+    
+    # Choice Fields - removing manual empty choices from choices list
+    gender = forms.ChoiceField(
+        choices=[
+            ('male', 'Male'),
+            ('female', 'Female'),
+            ('other', 'Other')
+        ],
+        required=False,
+        label=_("Gender"),
+        widget=forms.Select()
+    )
+    
+    preferred_contact_method = forms.ChoiceField(
+        choices=[
+            ('cell', 'Cell Phone'),
+            ('home', 'Home Phone'), 
+            ('work', 'Work Phone'),
+            ('email', 'Email'),
+        ],
+        required=False,
+        label=_("Preferred Contact Method"),
+        widget=forms.Select()
+    )
+    
+    education_degree = forms.ChoiceField(
+        choices=[
+            ('hospital_diploma', 'Hospital Diploma'),
+            ('associate', 'Associate Degree'),
+            ('bachelor', "Bachelor's Degree"),
+            ('master', "Master's Degree"),
+            ('doctorate', 'Doctorate Degree'),
+        ],
+        required=False,
+        label=_("Education Degree"),
+        widget=forms.Select()
+    )
+    
+    licensure_type = forms.ChoiceField(
+        choices=[
+            ('rn', 'RN'),
+            ('lpn', 'LPN'),
+            ('md', 'MD'),
+            ('sw', 'SW'),
+            ('other', 'Other'),
+        ],
+        required=False,
+        label=_("Licensure Type"),
+        widget=forms.Select()
+    )
+
+    # General Information
+    home_phone = forms.CharField(
+        max_length=15, 
+        required=False, 
+        label=_("Home Phone"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Home Phone'})
+    )
+    work_phone = forms.CharField(
+        max_length=15, 
+        required=False, 
+        label=_("Work Phone"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Work Phone'})
+    )
+    preferred_contact_time = forms.CharField(
+        max_length=100,
+        required=False,
+        label=_("Preferred Contact Time"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Preferred time of day'})
+    )
+    
+    license_number = forms.CharField(
+        max_length=50,
+        required=False,
+        label=_("License Number"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'License Number'})
+    )
+    license_state = forms.CharField(
+        max_length=30,
+        required=False,
+        label=_("License State"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'License State'})
+    )
+    
+    # Certifications
+    certifications = forms.MultipleChoiceField(
+        choices=[
+            ('ccm', 'CCM'),
+            ('cpho', 'CPHO'),
+            ('chm', 'CHM'),
+            ('cpur', 'CPUR'),
+            ('cphm', 'CPHM'),
+            ('coding', 'Coding'),
+            ('other_cert', 'Other'),
+        ],
+        required=False,
+        label=_("Certifications"),
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'oh-switch__checkbox'})
+    )
+    other_certification = forms.CharField(
+        max_length=100,
+        required=False,
+        label=_("Other Certification"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Other Certification'})
+    )
+    
+    # Clinical Criteria
+    clinical_criteria = forms.MultipleChoiceField(
+        choices=[
+            ('interqual', 'InterQual'),
+            ('milliman', 'Milliman'),
+            ('other_clinical', 'Other'),
+        ],
+        required=False,
+        label=_("Clinical Criteria"),
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'oh-switch__checkbox'})
+    )
+    other_clinical = forms.CharField(
+        max_length=100,
+        required=False,
+        label=_("Other Clinical Criteria"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Other Clinical Criteria'})
+    )
+    
+    # Computer Skills
+    computer_skills = forms.MultipleChoiceField(
+        choices=[
+            ('ms_excel', 'MS Excel'),
+            ('ms_word', 'MS Word'),
+            ('ms_access', 'MS Access'),
+            ('other_computer', 'Other'),
+        ],
+        required=False,
+        label=_("Computer Skills"),
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'oh-switch__checkbox'})
+    )
+    other_computer_skills = forms.CharField(
+        max_length=100,
+        required=False,
+        label=_("Other Computer Skills"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Other Computer Skills'})
+    )
+    
+    # Medical Coding
+    medical_coding = forms.MultipleChoiceField(
+        choices=[
+            ('icd_10', 'ICD-10'),
+            ('hcpc', 'HCPC'),
+            ('cpt', 'CPT'),
+            ('other_coding', 'Other'),
+        ],
+        required=False,
+        label=_("Medical Coding"),
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'oh-switch__checkbox'})
+    )
+    other_medical_coding = forms.CharField(
+        max_length=100,
+        required=False,
+        label=_("Other Medical Coding"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Other Medical Coding'})
+    )
+    
+    # Clinical Specialties and Experience
+    clinical_specialties = forms.CharField(
+        max_length=500,
+        required=False,
+        label=_("Clinical Specialties"),
+        widget=forms.Textarea(attrs={'class': 'oh-input w-100', 'placeholder': 'Clinical Specialty(ies)', 'rows': 3})
+    )
+    other_skills_experience = forms.CharField(
+        max_length=500,
+        required=False,
+        label=_("Other Skills/Experience"),
+        widget=forms.Textarea(attrs={'class': 'oh-input w-100', 'placeholder': 'Other applicable skills/experience', 'rows': 3})
+    )
+    
+    # Work Desired
+    preferred_schedule = forms.MultipleChoiceField(
+        choices=[
+            ('full_time', 'Full-time'),
+            ('part_time', 'Part-time'),
+            ('direct_hire', 'Direct Hire'),
+            ('temporary', 'Temporary Assignment'),
+        ],
+        required=False,
+        label=_("Preferred Schedule"),
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'oh-switch__checkbox'})
+    )
+    work_description = forms.CharField(
+        max_length=500,
+        required=False,
+        label=_("Work Description"),
+        widget=forms.Textarea(attrs={'class': 'oh-input w-100', 'placeholder': 'Please describe the kind of work/setting and geography you seek and/or list any Job Number(s) from our website (www.psninc.net) that interest you.', 'rows': 3})
+    )
+    
+    # Source Information
+    how_heard_about_psn = forms.ChoiceField(
+        choices=[
+            ('search_engine', 'Search engine (e.g., Google)'),
+            ('psn_website', 'PSN Website'),
+            ('indeed', 'Indeed'),
+            ('linkedin', 'LinkedIn'),
+            ('personal_referral', 'Personal Referral'),
+        ],
+        required=False,
+        label=_("How did you hear about PSN?"),
+        widget=forms.Select()
+    )
+    personal_referral_name = forms.CharField(
+        max_length=100,
+        required=False,
+        label=_("Referral Name"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Name of person or source of referral'})
+    )
+    
+    # Additional Questions
+    previous_psn_application = forms.BooleanField(
+        required=False,
+        label=_("Previously applied to PSN?"),
+        widget=forms.CheckboxInput(attrs={'class': 'oh-switch__checkbox'})
+    )
+    license_action_taken = forms.BooleanField(
+        required=False,
+        label=_("License action taken?"),
+        widget=forms.CheckboxInput(attrs={'class': 'oh-switch__checkbox'})
+    )
+    background_check_consent = forms.BooleanField(
+        required=False,
+        label=_("Background check consent"),
+        widget=forms.CheckboxInput(attrs={'class': 'oh-switch__checkbox'})
+    )
+    
+    # Confidentiality and Agreements
+    confidentiality_agreement = forms.BooleanField(
+        required=True,
+        label=_("Confidentiality Agreement"),
+        widget=forms.CheckboxInput(attrs={'class': 'oh-switch__checkbox'})
+    )
+    employment_at_will = forms.BooleanField(
+        required=True,
+        label=_("Employment at Will Agreement"),
+        widget=forms.CheckboxInput(attrs={'class': 'oh-switch__checkbox'})
+    )
+    
+    # References
+    reference1_name = forms.CharField(
+        max_length=100,
+        required=False,
+        label=_("Reference 1 Name"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Reference 1 Name'})
+    )
+    reference1_phone = forms.CharField(
+        max_length=15,
+        required=False,
+        label=_("Reference 1 Phone"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Reference 1 Phone'})
+    )
+    reference1_company = forms.CharField(
+        max_length=100,
+        required=False,
+        label=_("Reference 1 Company"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Reference 1 Company'})
+    )
+    reference1_position = forms.CharField(
+        max_length=100,
+        required=False,
+        label=_("Reference 1 Position"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Reference 1 Position'})
+    )
+    reference1_dates = forms.CharField(
+        max_length=50,
+        required=False,
+        label=_("Reference 1 Work Dates"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Reference 1 Dates Worked Together'})
+    )
+    reference1_type = forms.ChoiceField(
+        choices=[('supervisor', 'Supervisor'), ('professional', 'Professional')],
+        required=False,
+        label=_("Reference 1 Type"),
+        widget=forms.Select()
+    )
+    
+    reference2_name = forms.CharField(
+        max_length=100,
+        required=False,
+        label=_("Reference 2 Name"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Reference 2 Name'})
+    )
+    reference2_phone = forms.CharField(
+        max_length=15,
+        required=False,
+        label=_("Reference 2 Phone"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Reference 2 Phone'})
+    )
+    reference2_company = forms.CharField(
+        max_length=100,
+        required=False,
+        label=_("Reference 2 Company"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Reference 2 Company'})
+    )
+    reference2_position = forms.CharField(
+        max_length=100,
+        required=False,
+        label=_("Reference 2 Position"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Reference 2 Position'})
+    )
+    reference2_dates = forms.CharField(
+        max_length=50,
+        required=False,
+        label=_("Reference 2 Work Dates"),
+        widget=forms.TextInput(attrs={'class': 'oh-input w-100', 'placeholder': 'Reference 2 Dates Worked Together'})
+    )
+    reference2_type = forms.ChoiceField(
+        choices=[('supervisor', 'Supervisor'), ('professional', 'Professional')],
+        required=False,
+        label=_("Reference 2 Type"),
+        widget=forms.Select()
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Set the referral queryset
+        from employee.models import Employee
+        self.fields['referral'].queryset = Employee.objects.filter(is_active=True)
+        
+        # Apply consistent empty_label for all ChoiceField select widgets
+        choice_fields_with_empty_labels = [
+            ('gender', 'Gender'),
+            ('preferred_contact_method', 'Contact Method'),
+            ('education_degree', 'Degree'),
+            ('licensure_type', 'Licensure'),
+            ('how_heard_about_psn', 'Source'),
+            ('reference1_type', 'Type'),
+            ('reference2_type', 'Type'),
+        ]
+        
+        for field_name, label_text in choice_fields_with_empty_labels:
+            if field_name in self.fields:
+                # Add empty choice as the first option
+                current_choices = list(self.fields[field_name].choices)
+                empty_choice = ('', f'---Choose {label_text}---')
+                if empty_choice not in current_choices:
+                    self.fields[field_name].choices = [empty_choice] + current_choices
+
+    def save(self, commit=True):
+        """
+        Manually create and save a Candidate instance
+        """
+        candidate = Candidate()
+        
+        # Map form data to candidate fields
+        candidate.name = self.cleaned_data.get('name')
+        candidate.email = self.cleaned_data.get('email')
+        candidate.mobile = self.cleaned_data.get('mobile')
+        candidate.portfolio = self.cleaned_data.get('portfolio')
+        candidate.dob = self.cleaned_data.get('dob')
+        candidate.address = self.cleaned_data.get('address')
+        candidate.country = self.cleaned_data.get('country')
+        candidate.state = self.cleaned_data.get('state')
+        candidate.city = self.cleaned_data.get('city')
+        candidate.zip = self.cleaned_data.get('zip')
+        candidate.resume = self.cleaned_data.get('resume')
+        candidate.recruitment_id = self.cleaned_data.get('recruitment_id')
+        candidate.job_position_id = self.cleaned_data.get('job_position_id')
+        candidate.gender = self.cleaned_data.get('gender')
+        candidate.referral = self.cleaned_data.get('referral')
+        
+        # Set default values
+        candidate.source = "application"
+        
+        # Set initial stage
+        if candidate.recruitment_id and not candidate.stage_id:
+            candidate.stage_id = Stage.objects.filter(
+                recruitment_id=candidate.recruitment_id, stage_type="initial"
+            ).first()
+            
+        if commit:
+            candidate.save()
+            
+        return candidate

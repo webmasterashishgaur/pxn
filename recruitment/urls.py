@@ -150,6 +150,10 @@ urlpatterns = [
         name="remove-recruitment-manager",
     ),
     path("candidate-create", views.candidate, name="candidate-create"),
+    path("candidate-register", views.candidate_register, name="candidate-register"),
+    path("parse-resume-ajax", views.parse_resume_ajax, name="parse-resume-ajax"),
+    path("candidate-registration-success", views.candidate_registration_success, name="candidate-registration-success"),
+    path("candidate-registration-pdf", views.candidate_registration_pdf_psn_format, name="candidate-registration-pdf"),
     path(
         "recruitment-stage-get/<int:rec_id>/",
         views.recruitment_stage_get,
