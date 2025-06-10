@@ -39,6 +39,11 @@ SUBMENUS = [
         "accessibility": "recruitment.sidebar.candidates_accessibility",
     },
     {
+        "menu": _("Register Candidate"),
+        "redirect": reverse("candidate-register"),
+        "accessibility": "recruitment.sidebar.register_candidate_accessibility",
+    },
+    {
         "menu": _("Interview"),
         "redirect": reverse("interview-view"),
         "accessibility": "recruitment.sidebar.interview_accessibility",
@@ -137,3 +142,9 @@ def skill_zone_accessibility(
 
 def dashboard_accessibility(request, submenu, user_perms, *args, **kwargs):
     return is_stagemanager(request.user) or "recruitment" in user_perms
+
+
+def register_candidate_accessibility(
+    request, _submenu: dict = {}, user_perms: PermWrapper = [], *args, **kwargs
+) -> bool:
+    return request.user.has_perm("recruitment.add_candidate")

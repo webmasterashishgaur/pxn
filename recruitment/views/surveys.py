@@ -33,6 +33,7 @@ from recruitment.forms import (
     SurveyForm,
     SurveyPreviewForm,
     TemplateForm,
+    ParsedResumeDetailsForm,
 )
 from recruitment.models import (
     Candidate,
@@ -381,12 +382,13 @@ def application_form(request):
 
                 candidate_obj.resume = resume_path
             try:
-                profile = request.FILES["profile"] if request.FILES["profile"] else None
-                profile_path = f"recruitment/profile/{candidate_obj.name.replace(' ', '_')}_{profile.name}_{uuid4()}"
-                with default_storage.open(profile_path, "wb+") as destination:
-                    for chunk in profile.chunks():
-                        destination.write(chunk)
-                candidate_obj.profile = profile_path
+                profile = request.FILES.get("profile")
+                if profile:
+                    profile_path = f"recruitment/profile/{candidate_obj.name.replace(' ', '_')}_{profile.name}_{uuid4()}"
+                    with default_storage.open(profile_path, "wb+") as destination:
+                        for chunk in profile.chunks():
+                            destination.write(chunk)
+                    candidate_obj.profile = profile_path
             except:
                 pass
             request.session["candidate"] = serializers.serialize(
@@ -520,3 +522,46 @@ def question_add(request):
             messages.success(request, "Question added")
             return HttpResponse("<script>window.location.reload()</script>")
     return render(request, "survey/add_form.html", {"form": form})
+
+
+@login_required
+@hx_request_required
+@permission_required("recruitment.change_candidate")
+def update_parsed_resume(request, candidate_id):
+    """
+    This method is used to update parsed resume details
+    """
+    candidate = Candidate.objects.get(id=candidate_id)
+    
+    if request.method == "POST":
+        form = ParsedResumeDetailsForm(request.POST, instance=candidate)
+        if form.is_valid():
+            form.save(candidate)
+            messages.success(request, _("Parsed resume details updated successfully."))
+            return HttpResponse(
+                "<script>location.reload();</script>"
+            )
+        else:
+            messages.error(request, _("Please correct the errors below."))
+            return render(request, "candidate/parsed_resume_edit_form.html", {
+                "form": form, 
+                "candidate": candidate
+            })
+    
+    return HttpResponse(status=405)
+
+
+@login_required
+@hx_request_required
+@permission_required("recruitment.change_candidate")
+def edit_parsed_resume(request, candidate_id):
+    """
+    This method renders the edit form for parsed resume details
+    """
+    candidate = Candidate.objects.get(id=candidate_id)
+    form = ParsedResumeDetailsForm(instance=candidate)
+    
+    return render(request, "candidate/parsed_resume_edit_form.html", {
+        "form": form, 
+        "candidate": candidate
+    })

@@ -104,6 +104,7 @@
                       id="name"
                       name="name"
                       required
+                      maxlength="100"
                       class="oh-input w-100"
                       placeholder="e.g. Jane Doe"
                     />
@@ -179,6 +180,7 @@
                       id="phone"
                       class="oh-input w-100"
                       name="mobile"
+                      required
                       placeholder="e.g. +1 245 999 999"
                     />
                     {{form.mobile.errors}}
@@ -366,16 +368,17 @@
       }
   });
   function validateForm(event) {
-    var fileInput = document.getElementById("photo");
-    var errorList = document.getElementById("error-list");
-    {% if not perms.recruitment.add_candidate %}
-      if (!fileInput.value) {
-        errorList.scrollIntoView({ behavior: "smooth", block: "center" });
-        errorList.style.display = "block"; // Show error message
-      } else {
-        errorList.style.display = "none"; // Hide error message
-      }
-    {% endif %}
+    // Profile image validation removed - image is now optional
+    // var fileInput = document.getElementById("photo");
+    // var errorList = document.getElementById("error-list");
+    // {% if not perms.recruitment.add_candidate %}
+    //   if (!fileInput.value) {
+    //     errorList.scrollIntoView({ behavior: "smooth", block: "center" });
+    //     errorList.style.display = "block"; // Show error message
+    //   } else {
+    //     errorList.style.display = "none"; // Hide error message
+    //   }
+    // {% endif %}
   }
   $(document).ready(function(){
     function getCookie(name) {

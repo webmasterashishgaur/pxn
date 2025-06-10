@@ -1,40 +1,104 @@
 {% extends 'index.html' %} {% load i18n %} {% load horillafilters %} {% load static %} {% block content %} {% load recruitmentfilters %}
 <script>
-  function submitForm(elem) {
-    $(elem).siblings(".add_more_submit").click();
-  }
-  function enlargeImage(src, $element) {
-    var enlargeDocContainer = $element
-      .parents()
-      .closest("li")
-      .find("#enlargeDocContainer");
-    enlargeDocContainer.empty();
-    style =
-      "width:100%; height:90%; box-shadow: 0 10px 10px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.2); background:white";
-    var enlargedImage = $("<iframe>").attr({ src: src, style: style });
-    var name = $("<span>").text(src.split("/").pop().replace(/_/g, " "));
-    enlargeDocContainer.append(enlargedImage);
-    enlargeDocContainer.append(name);
-    setTimeout(function () {
-      enlargeDocContainer.show();
-
-      const iframe = document.querySelector("iframe").contentWindow;
-      var iframe_document = iframe.document;
-      iframe_image = iframe_document.getElementsByTagName("img")[0];
-      $(iframe_image).attr("style", "width:100%; height:100%;");
-    }, 100);
-  }
-
-  function hideEnlargeImage() {
-    var enlargeDocContainer = $(".enlargeDocContainer");
-    enlargeDocContainer.empty();
-  }
-
-  $(document).on("click", function (event) {
-    if (!$(event.target).closest("#enlargeDocContainer").length) {
-      hideEnlargeImage();
+  $(document).ready(function () {
+    // Active tab script
+    function activeCandTab() {
+      var activeTab = localStorage.getItem("activeCandTab");
+      if (
+        !$(`[data-target="${activeTab}"]`).length &&
+        $(`[data-target="#personal"]`).length
+      ) {
+        $(`[data-target="#personal"]`)[0].click();
+      } else if (activeTab != null) {
+        $(".oh-general__tab-link--active").removeClass(
+          "oh-general__tab-link--active"
+        );
+        $(`[data-target='${activeTab}']`).addClass(
+          "oh-general__tab-link--active"
+        );
+        $(".oh-general__tab-target").addClass("d-none");
+        $(activeTab).removeClass("d-none");
+        $(`[data-target="${activeTab}"]`)[0].click()
+      }
     }
+    activeCandTab();
+    $("[data-action=general-tab]").click(function (e) {
+      e.preventDefault();
+      const targetId = $(this).attr("data-target");
+      localStorage.setItem("activeCandTab", targetId);
+    });
+
+    // Initialize accordion functionality
+    initAccordion();
   });
+
+  // Profile picture enlarging
+  function showImage(image) {
+    var showImageContainer = document.getElementById("showImageContainer");
+    showImageContainer.innerHTML = "";
+
+    var enlargedImage = document.createElement("img");
+    enlargedImage.src = image.src;
+    showImageContainer.appendChild(enlargedImage);
+
+    setTimeout(function () {
+      showImageContainer.style.display = "block";
+    }, 250);
+  }
+
+  function hideshowImage() {
+    var showImageContainer = document.getElementById("showImageContainer");
+    showImageContainer.innerHTML = "";
+    showImageContainer.style.display = "none";
+  }
+
+  // Accordion functionality
+  function initAccordion() {
+    const accordionHeaders = document.querySelectorAll('.oh-accordion-header');
+    
+    accordionHeaders.forEach(header => {
+      header.addEventListener('click', function() {
+        const accordion = this.parentElement;
+        accordion.classList.toggle('active');
+      });
+    });
+    
+    // Open recruitment information accordion by default
+    const recruitmentAccordion = document.querySelector('.oh-accordion');
+    if (recruitmentAccordion) {
+      recruitmentAccordion.classList.add('active');
+    }
+  }
+
+  function toggleEditMode() {
+    const editButton = document.querySelector('#editButtonText');
+    const saveButtonContainer = document.querySelector('#saveButtonContainer');
+    const editModeElements = document.querySelectorAll('.edit-mode');
+    const viewModeElements = document.querySelectorAll('.view-mode');
+    
+    if (editButton && editButton.textContent.trim() === '{% trans "Edit" %}') {
+      editButton.textContent = '{% trans "Cancel" %}';
+      if (saveButtonContainer) saveButtonContainer.classList.remove('d-none');
+      editModeElements.forEach(el => el.classList.remove('d-none'));
+      viewModeElements.forEach(el => el.classList.add('d-none'));
+    } else if (editButton) {
+      editButton.textContent = '{% trans "Edit" %}';
+      if (saveButtonContainer) saveButtonContainer.classList.add('d-none');
+      editModeElements.forEach(el => el.classList.add('d-none'));
+      viewModeElements.forEach(el => el.classList.remove('d-none'));
+    }
+  }
+
+  // Check if form exists before adding event listener
+  const parsedResumeForm = document.getElementById('parsedResumeForm');
+  if (parsedResumeForm) {
+    parsedResumeForm.addEventListener('htmx:afterRequest', function(evt) {
+      if (evt.detail.successful) {
+        toggleEditMode();
+        location.reload();
+      }
+    });
+  }
 </script>
 <style>
   .enlarge-image-container {
@@ -63,6 +127,42 @@
   }
   body {
     background-color: #f9f9f9 !important;
+  }
+  .oh-accordion {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .oh-accordion-header {
+    background: #f8f9fa;
+    padding: 12px 16px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 1px solid #e0e0e0;
+    transition: background-color 0.3s ease;
+  }
+  .oh-accordion-header:hover {
+    background: #e9ecef;
+  }
+  .oh-accordion-arrow {
+    transition: transform 0.3s ease;
+  }
+  .oh-accordion.active .oh-accordion-arrow {
+    transform: rotate(180deg);
+  }
+  .oh-accordion-body {
+    padding: 16px;
+    background: #fff;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+  .oh-accordion.active .oh-accordion-body {
+    max-height: 500px;
   }
 </style>
 
@@ -108,10 +208,11 @@
         <div class='d-flex float-end ms-4'>
           {% if not candidate.email in emp_list and not candidate.start_onboard %}
             <form action="{% url 'candidate-conversion' candidate.id %}" style="color: inherit;text-decoration: none;"
-              onsubmit="return confirm('{% trans "Are you sure you want to convert this candidate into an employee?" %}')"
+              data-confirm-message="{% trans 'Are you sure you want to convert this candidate into an employee?' %}"
+              onsubmit="return confirm(this.dataset.confirmMessage)"
               >
               {% csrf_token %}
-              <button type='submit' class="oh-btn oh-btn--success"style="border-radius:18px; "> {% trans "Convert To Employee" %}</button>
+              <button type='submit' class="oh-btn oh-btn--success" style="border-radius:18px; "> {% trans "Convert To Employee" %}</button>
             </form>
           {% endif %}
         </div>
@@ -128,12 +229,8 @@
                 class="oh-profile-section__avatar preview"
                 alt="Username"
                 style="border-radius:10%"
-                onmouseover="showImage(this)
-                  $('#showImageContainer').addClass('enlarge-image-container');
-                "
-                onmouseout="hideshowImage()
-                  $('#showImageContainer').removeClass('enlarge-image-container');
-                "
+                onmouseover="showImage(this); $('#showImageContainer').addClass('enlarge-image-container');"
+                onmouseout="hideshowImage(); $('#showImageContainer').removeClass('enlarge-image-container');"
               />
             </div>
             <span
@@ -379,76 +476,83 @@
                   >
                 </div>
                 <div class="oh-card__body mt-4">
-                  <div class="row">
-                    <div class="col-12 col-sm-12 col-md-12 col-lg-6">
-                      <ul class="oh-profile__card-info-list">
-                        <li class="oh-profile__card-info-item">
-                          <span class="oh-profile__info-label mb-1">
-                            <ion-icon name="construct-outline"></ion-icon>
-                            <span>{% trans "Recruitment" %}</span>
-                          </span>
-                          <span class="oh-profile__info-value"
-                            >{{candidate.recruitment_id}}</span
-                          >
-                        </li>
-                        <li class="oh-profile__card-info-item">
-                          <span class="oh-profile__info-label mb-1">
-                            <ion-icon name="briefcase-outline"></ion-icon>
-
-                            <span>{% trans "Department" %}</span>
-                          </span>
-                          <span class="oh-profile__info-value"
-                            >{{candidate.job_position_id.department_id}}</span
-                          >
-                        </li>
-                        <li class="oh-profile__card-info-item">
-                          <span class="oh-profile__info-label mb-1">
-                            <ion-icon
-                              name="file-tray-stacked-outline"
-                            ></ion-icon>
-                            <span>{% trans "Source" %}</span>
-                          </span>
-                          {% if candidate.get_source_display != None %}
-                            <span class="oh-profile__info-value"
-                              >{{candidate.get_source_display}}</span
-                            >
-                          {% endif %}
-                        </li>
-                      </ul>
+                  <div class="oh-accordion">
+                    <div class="oh-accordion-header">
+                      <span>{% trans "Position & Recruitment Details" %}</span>
+                      <ion-icon name="chevron-down-outline" class="oh-accordion-arrow"></ion-icon>
                     </div>
+                    <div class="oh-accordion-body">
+                      <div class="row">
+                        <div class="col-12 col-sm-12 col-md-12 col-lg-6">
+                          <ul class="oh-profile__card-info-list">
+                            <li class="oh-profile__card-info-item">
+                              <span class="oh-profile__info-label mb-1">
+                                <ion-icon name="construct-outline"></ion-icon>
+                                <span>{% trans "Recruitment" %}</span>
+                              </span>
+                              <span class="oh-profile__info-value"
+                                >{{candidate.recruitment_id}}</span
+                              >
+                            </li>
+                            <li class="oh-profile__card-info-item">
+                              <span class="oh-profile__info-label mb-1">
+                                <ion-icon name="briefcase-outline"></ion-icon>
+                                <span>{% trans "Job Position" %}</span>
+                              </span>
+                              <span class="oh-profile__info-value"
+                                >{{candidate.job_position_id}}</span
+                              >
+                            </li>
+                            <li class="oh-profile__card-info-item">
+                              <span class="oh-profile__info-label mb-1">
+                                <ion-icon name="people-outline"></ion-icon>
+                                <span>{% trans "Referral" %}</span>
+                              </span>
+                              <span class="oh-profile__info-value"
+                                >{{candidate.referral}}</span
+                              >
+                            </li>
+                          </ul>
+                        </div>
 
-                    <div class="col-12 col-sm-12 col-md-12 col-lg-6">
-                      <ul class="oh-profile__card-info-list">
-                        <li class="oh-profile__card-info-item">
-                          <span class="oh-profile__info-label mb-1">
-                            <ion-icon
-                              name="file-tray-stacked-outline"
-                            ></ion-icon>
-                            <span>{% trans "Current Stage" %}</span>
-                          </span>
-                          <span class="oh-profile__info-value"
-                            >{{candidate.stage_id}}</span
-                          >
-                        </li>
-                        <li class="oh-profile__card-info-item">
-                          <span class="oh-profile__info-label mb-1">
-                            <ion-icon name="briefcase-outline"></ion-icon>
-                            <span>{% trans "Job Position" %}</span>
-                          </span>
-                          <span class="oh-profile__info-value"
-                            >{{candidate.job_position_id}}</span
-                          >
-                        </li>
-                        <li class="oh-profile__card-info-item">
-                          <span class="oh-profile__info-label mb-1">
-                            <ion-icon name="people-outline"></ion-icon>
-                            <span>{% trans "Referral" %}</span>
-                          </span>
-                          <span class="oh-profile__info-value"
-                            >{{candidate.referral}}</span
-                          >
-                        </li>
-                      </ul>
+                        <div class="col-12 col-sm-12 col-md-12 col-lg-6">
+                          <ul class="oh-profile__card-info-list">
+                            <li class="oh-profile__card-info-item">
+                              <span class="oh-profile__info-label mb-1">
+                                <ion-icon name="briefcase-outline"></ion-icon>
+                                <span>{% trans "Department" %}</span>
+                              </span>
+                              <span class="oh-profile__info-value"
+                                >{{candidate.job_position_id.department_id}}</span
+                              >
+                            </li>
+                            <li class="oh-profile__card-info-item">
+                              <span class="oh-profile__info-label mb-1">
+                                <ion-icon
+                                  name="file-tray-stacked-outline"
+                                ></ion-icon>
+                                <span>{% trans "Current Stage" %}</span>
+                              </span>
+                              <span class="oh-profile__info-value"
+                                >{{candidate.stage_id}}</span
+                              >
+                            </li>
+                            <li class="oh-profile__card-info-item">
+                              <span class="oh-profile__info-label mb-1">
+                                <ion-icon
+                                  name="file-tray-stacked-outline"
+                                ></ion-icon>
+                                <span>{% trans "Source" %}</span>
+                              </span>
+                              {% if candidate.get_source_display != None %}
+                                <span class="oh-profile__info-value"
+                                  >{{candidate.get_source_display}}</span
+                                >
+                              {% endif %}
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -484,7 +588,7 @@
           <!-- end of comment modal -->
 
           <div class="oh-modal" id="createModal" role="dialog" aria-hidden="true">
-            <div class="oh-modal__dialog" style="max-width: 550px">
+            <div class="oh-modal__dialog" style="max-width: 900px; width: 90vw;">
                 <div class="oh-modal__dialog-header">
                 <button onclick="$(this).closest('#createModal').removeClass('oh-modal--show');" type="button" class="oh-modal__close" aria-label="Close"><ion-icon name="close-outline"></ion-icon></button>
                 </div>
@@ -532,7 +636,7 @@
           {% endif %}
         </div>
         <div
-          class="oh-general__tab-target oh-profile__info-tab mb-4"
+          class="oh-general__tab-target oh-profile__info-tab mb-4 d-none"
           id="survey"
           >
           <!-- #3 -->
@@ -667,158 +771,144 @@
         </div>
         <div class="oh-general__tab-target oh-profile__info-tab mb-4 d-none" id="parsed-resume-details">
           <div class="oh-card oh-card--margin">
-            <div class="oh-card__header">
+            <div class="oh-card__header d-flex justify-content-between align-items-center">
               <span class="oh-card__title oh-card__title--sm fw-bold me-2">
                 {% trans "Parsed Resume Details" %}
               </span>
+              {% if perms.recruitment.change_candidate %}
+              <button class="oh-btn oh-btn--secondary" 
+                      hx-get="{% url 'edit-parsed-resume' candidate.id %}" 
+                      hx-target="#createTarget" 
+                      onclick="$('#createModal').addClass('oh-modal--show');">
+                <ion-icon name="create-outline"></ion-icon>
+                <span>{% trans "Edit" %}</span>
+              </button>
+              {% endif %}
             </div>
             <div class="oh-card__body mt-4">
               {% if candidate.parsed_resume_details %}
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <h6>{% trans "Education" %}</h6>
-                  {% if candidate.parsed_resume_details.education %}
-                  {% if candidate.parsed_resume_details.education|length > 0 %}
-                  <ul class="list-group">
-                    {% for edu in candidate.parsed_resume_details.education %}
-                    <li class="list-group-item">
-                      {% if edu.items %}
-                      <strong>{{ edu.degree|default:"" }}</strong>
-                      {% if edu.institution %} at {{ edu.institution }}{% endif %}
-                      {% if edu.years %} ({{ edu.years }}){% endif %}
-                      {% if edu.concentration %}<br><span class="text-muted">{{ edu.concentration }}</span>{% endif %}
+                <div class="row">
+                  <div class="col-md-6 mb-4">
+                    <h6 class="fw-bold mb-3">
+                      <ion-icon name="school-outline" class="me-2"></ion-icon>
+                      {% trans "Education" %}
+                    </h6>
+                    {% if candidate.parsed_resume_details.education %}
+                      {% if candidate.parsed_resume_details.education|length > 0 %}
+                        <div class="list-group list-group-flush">
+                          {% for edu in candidate.parsed_resume_details.education %}
+                            <div class="list-group-item border-0 px-0">
+                              {% if edu.degree or edu.institution or edu.years or edu.concentration %}
+                                <div>
+                                  {% if edu.degree %}<strong>{{ edu.degree }}</strong>{% endif %}
+                                  {% if edu.institution %} at {{ edu.institution }}{% endif %}
+                                  {% if edu.years %} ({{ edu.years }}){% endif %}
+                                  {% if edu.concentration %}<br><span class="text-muted">{{ edu.concentration }}</span>{% endif %}
+                                </div>
+                              {% else %}
+                                <div>{{ edu }}</div>
+                              {% endif %}
+                            </div>
+                          {% endfor %}
+                        </div>
                       {% else %}
-                      {{ edu }}
+                        <span class="text-muted">-</span>
                       {% endif %}
-                    </li>
-                    {% endfor %}
-                  </ul>
-                  {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %}
-                  {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %}
-                </div>
-                <div class="col-md-6 mb-3">
-                  <h6>{% trans "Skills" %}</h6>
-                  {% if candidate.parsed_resume_details.skills %}
-                  {% if candidate.parsed_resume_details.skills|length > 0 %}
-                  <ul class="list-group list-group-flush">
-                    {% for skill in candidate.parsed_resume_details.skills %}
-                    <li class="list-group-item">{{ skill }}</li>
-                    {% endfor %}
-                  </ul>
-                  {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %}
-                  {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %}
-                </div>
-                <div class="col-md-6 mb-3">
-                  <h6>{% trans "Experience" %}</h6>
-                  {% if candidate.parsed_resume_details.experience %}
-                  {% if candidate.parsed_resume_details.experience|length > 0 %}
-                  <ul class="list-group">
-                    {% for exp in candidate.parsed_resume_details.experience %}
-                    <li class="list-group-item">
-                      {% if exp.items %}
-                      <strong>{{ exp.title|default:"" }}</strong>
-                      {% if exp.company %} at {{ exp.company }}{% endif %}
-                      {% if exp.years %} ({{ exp.years }}){% endif %}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </div>
+
+                  <div class="col-md-6 mb-4">
+                    <h6 class="fw-bold mb-3">
+                      <ion-icon name="build-outline" class="me-2"></ion-icon>
+                      {% trans "Skills" %}
+                    </h6>
+                    {% if candidate.parsed_resume_details.skills %}
+                      {% if candidate.parsed_resume_details.skills|length > 0 %}
+                        <div class="d-flex flex-wrap gap-2">
+                          {% for skill in candidate.parsed_resume_details.skills|smart_split %}
+                            <span class="badge bg-light text-dark">{{ skill }}</span>
+                          {% endfor %}
+                        </div>
                       {% else %}
-                      {{ exp }}
+                        <span class="text-muted">-</span>
                       {% endif %}
-                    </li>
-                    {% endfor %}
-                  </ul>
-                  {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %}
-                  {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </div>
+
+                  <div class="col-md-6 mb-4">
+                    <h6 class="fw-bold mb-3">
+                      <ion-icon name="briefcase-outline" class="me-2"></ion-icon>
+                      {% trans "Experience" %}
+                    </h6>
+                    {% if candidate.parsed_resume_details.experience %}
+                      {% if candidate.parsed_resume_details.experience|length > 0 %}
+                        <div class="list-group list-group-flush">
+                          {% for exp in candidate.parsed_resume_details.experience %}
+                            <div class="list-group-item border-0 px-0">
+                              {% if exp.title or exp.company or exp.years %}
+                                <div>
+                                  {% if exp.title %}<strong>{{ exp.title }}</strong>{% endif %}
+                                  {% if exp.company %} at {{ exp.company }}{% endif %}
+                                  {% if exp.years %} ({{ exp.years }}){% endif %}
+                                </div>
+                              {% else %}
+                                <div>{{ exp }}</div>
+                              {% endif %}
+                            </div>
+                          {% endfor %}
+                        </div>
+                      {% else %}
+                        <span class="text-muted">-</span>
+                      {% endif %}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </div>
+
+                  <div class="col-md-6 mb-4">
+                    <h6 class="fw-bold mb-3">
+                      <ion-icon name="ribbon-outline" class="me-2"></ion-icon>
+                      {% trans "Certifications" %}
+                    </h6>
+                    {% if candidate.parsed_resume_details.certifications %}
+                      {% if candidate.parsed_resume_details.certifications|length > 0 %}
+                        <div class="d-flex flex-wrap gap-2">
+                          {% for cert in candidate.parsed_resume_details.certifications|smart_split %}
+                            <span class="badge bg-light text-dark">{{ cert }}</span>
+                          {% endfor %}
+                        </div>
+                      {% else %}
+                        <span class="text-muted">-</span>
+                      {% endif %}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </div>
+
+                  <div class="col-12 mb-4">
+                    <h6 class="fw-bold mb-3">
+                      <ion-icon name="document-text-outline" class="me-2"></ion-icon>
+                      {% trans "Summary" %}
+                    </h6>
+                    <div class="border rounded p-3" style="background-color: #f8f9fa;">
+                      <p class="mb-0">{{ candidate.parsed_resume_details.summary|default_if_none:"-" }}</p>
+                    </div>
+                  </div>
                 </div>
-                <div class="col-md-6 mb-3">
-                  <h6>{% trans "Certifications" %}</h6>
-                  {% if candidate.parsed_resume_details.certifications %}
-                  {% if candidate.parsed_resume_details.certifications|length > 0 %}
-                  <ul class="list-group list-group-flush">
-                    {% for cert in candidate.parsed_resume_details.certifications %}
-                    <li class="list-group-item">{{ cert }}</li>
-                    {% endfor %}
-                  </ul>
-                  {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %}
-                  {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %}
-                </div>
-                <div class="col-12 mb-3">
-                  <h6>{% trans "Summary" %}</h6>
-                  <p>{{ candidate.parsed_resume_details.summary|default_if_none:"-" }}</p>
-                </div>
-              </div>
               {% else %}
-              <p class="text-muted">{% trans "No parsed resume details available." %}</p>
+                <div class="text-center py-5">
+                  <img style="width: 80px; height: 80px;" src="{% static 'images/ui/editor.png' %}" />
+                  <h5 class="oh-404__subtitle mt-3">{% trans "No parsed resume details available." %}</h5>
+                </div>
               {% endif %}
             </div>
           </div>
-      </div>
+        </div>
     </div>
   </div>
 </div>
-<script>
-  $(document).ready(function () {
-    // Active tab script
-    function activeCandTab() {
-      var activeTab = localStorage.getItem("activeCandTab");
-      if (
-        !$(`[data-target="${activeTab}"]`).length &&
-        $(`[data-target="#personal"]`).length
-      ) {
-        $(`[data-target="#personal"]`)[0].click();
-      } else if (activeTab != null) {
-        $(".oh-general__tab-link--active").removeClass(
-          "oh-general__tab-link--active"
-        );
-        $(`[data-target='${activeTab}']`).addClass(
-          "oh-general__tab-link--active"
-        );
-        $(".oh-general__tab-target").addClass("d-none");
-        $(activeTab).removeClass("d-none");
-        $(`[data-target="${activeTab}"]`)[0].click()
-      }
-    }
-    activeCandTab();
-    $("[data-action=general-tab]").click(function (e) {
-      e.preventDefault();
-      const targetId = $(this).attr("data-target");
-      localStorage.setItem("activeCandTab", targetId);
-    });
-  });
-
-  // Profile picture enlarging
-
-  function showImage(image) {
-    var showImageContainer = document.getElementById("showImageContainer");
-    showImageContainer.innerHTML = "";
-
-    var enlargedImage = document.createElement("img");
-    enlargedImage.src = image.src;
-    showImageContainer.appendChild(enlargedImage);
-
-    setTimeout(function () {
-      showImageContainer.style.display = "block";
-    }, 250);
-  }
-
-  function hideshowImage() {
-    var showImageContainer = document.getElementById("showImageContainer");
-    showImageContainer.innerHTML = ""; // Clear the content
-    showImageContainer.style.display = "none";
-  }
-</script>
 {% endblock content %}

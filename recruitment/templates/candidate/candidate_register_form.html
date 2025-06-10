@@ -1,0 +1,736 @@
+{% extends 'index.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block content %}
+<style>
+    select.form-control, input.form-control, select.oh-input, input.oh-input, select.oh-select, input.oh-select {
+        border: 1px solid hsl(213,22%,84%) !important;
+        border-radius: 0rem !important;
+        padding: 0.8rem 1.25rem !important;
+        color: hsl(0,0%,11%) !important;
+        font-size: 1rem !important;
+        background-color: #fff !important;
+        box-sizing: border-box !important;
+        display: block !important;
+        width: 100% !important;
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        -moz-appearance: none !important;
+        min-height: 48px !important;
+        line-height: 1.5 !important;
+    }
+    .form-section {
+        background: #fff;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .form-section h3 {
+        color: #2c5282;
+        background: #e6f3ff;
+        padding: 10px 15px;
+        margin: -20px -20px 20px -20px;
+        border-radius: 8px 8px 0 0;
+        font-size: 16px;
+        font-weight: bold;
+    }
+    .form-row {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+    .form-group {
+        flex: 1;
+        min-width: 0;
+    }
+    .form-group.full-width {
+        flex: 2;
+    }
+    .checkbox-group {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .required-star::after {
+        content: " *";
+        color: red;
+    }
+    .upload-area {
+        border: 2px dashed #cbd5e0;
+        border-radius: 8px;
+        padding: 40px;
+        text-align: center;
+        background: #f7fafc;
+        cursor: pointer;
+        transition: border-color 0.3s;
+    }
+    .upload-area:hover {
+        border-color: #4299e1;
+    }
+    .upload-area.dragover {
+        border-color: #3182ce;
+        background: #ebf8ff;
+    }
+    .parsed-data {
+        background: #f0fff4;
+        border: 1px solid #9ae6b4;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 15px;
+    }
+</style>
+
+<div class="oh-wrapper">
+    <div class="oh-card mt-4 mb-5">
+        <div class="oh-card__header">
+            <h2 class="oh-card__title">{% trans "Register Candidate" %}</h2>
+        </div>
+        <div class="oh-card__body">
+            {% if messages %}
+                <div class="oh-alert-container">
+                    {% for message in messages %}
+                        <div class="oh-alert oh-alert--animated {{message.tags}}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <form method="post" enctype="multipart/form-data" id="registration-form">
+                {% csrf_token %}
+
+                <!-- Resume Upload Section -->
+                <div class="form-section">
+                    <h3>{% trans "Resume Upload" %}</h3>
+                    <div class="form-group">
+                        <label for="id_resume" class="form-label">{% trans "Resume" %} <span class="text-danger">*</span></label>
+                        <input type="file" 
+                               name="resume" 
+                               id="id_resume" 
+                               class="form-control" 
+                               accept=".pdf"
+                               onchange="handleResumeUpload(this)">
+                        <small class="form-text text-muted">Upload your resume (PDF format) to auto-fill form fields</small>
+                        <div id="resume-parsing-status" style="display: none;"></div>
+                    </div>
+                </div>
+
+                <!-- General Information -->
+                <div class="form-section">
+                    <h3>{% trans "General Information" %}</h3>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label required-star">{% trans "Full Name" %}</label>
+                            {{ form.name }}
+                            {{ form.name.errors }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label required-star">{% trans "Email Address" %}</label>
+                            {{ form.email }}
+                            {{ form.email.errors }}
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label required-star">{% trans "Cell Phone" %}</label>
+                            {{ form.mobile }}
+                            {{ form.mobile.errors }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Home Phone" %}</label>
+                            {{ form.home_phone }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Work Phone" %}</label>
+                            {{ form.work_phone }}
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Best way to contact you" %}</label>
+                            {{ form.preferred_contact_method }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Preferred time of day" %}</label>
+                            {{ form.preferred_contact_time }}
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group full-width">
+                            <label class="oh-label">{% trans "Address" %}</label>
+                            {{ form.address }}
+                            {{ form.address.errors }}
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "City" %}</label>
+                            {{ form.city }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "State" %}</label>
+                            {{ form.state }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Zip Code" %}</label>
+                            {{ form.zip }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Country" %}</label>
+                            {{ form.country }}
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Date of Birth" %}</label>
+                            {{ form.dob }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Gender" %}</label>
+                            {{ form.gender }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Portfolio" %}</label>
+                            {{ form.portfolio }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recruitment Information -->
+                <div class="form-section">
+                    <h3>{% trans "Recruitment Information" %}</h3>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label required-star">{% trans "Recruitment" %}</label>
+                            {{ form.recruitment_id }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label required-star">{% trans "Job Position" %}</label>
+                            {{ form.job_position_id }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Referral" %}</label>
+                            {{ form.referral }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Education/Licensure/Certifications -->
+                <div class="form-section">
+                    <h3>{% trans "Education / Licensure / Certifications" %}</h3>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Degree" %}</label>
+                            {{ form.education_degree }}
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Licensure" %}</label>
+                            {{ form.licensure_type }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "License Number" %}</label>
+                            {{ form.license_number }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "License State" %}</label>
+                            {{ form.license_state }}
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="oh-label">{% trans "Certifications" %}</label>
+                        <div class="checkbox-group">
+                            {% for choice in form.certifications %}
+                                <div class="checkbox-item">
+                                    {{ choice.tag }}
+                                    <label for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Other Certification" %}</label>
+                            {{ form.other_certification }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Skills and Experience -->
+                <div class="form-section">
+                    <h3>{% trans "Skills and Experience" %}</h3>
+                    
+                    <div class="form-group">
+                        <label class="oh-label">{% trans "Clinical Criteria" %}</label>
+                        <div class="checkbox-group">
+                            {% for choice in form.clinical_criteria %}
+                                <div class="checkbox-item">
+                                    {{ choice.tag }}
+                                    <label for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Other Clinical Criteria" %}</label>
+                            {{ form.other_clinical }}
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="oh-label">{% trans "Computer Skills" %}</label>
+                        <div class="checkbox-group">
+                            {% for choice in form.computer_skills %}
+                                <div class="checkbox-item">
+                                    {{ choice.tag }}
+                                    <label for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Other Computer Skills" %}</label>
+                            {{ form.other_computer_skills }}
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="oh-label">{% trans "Medical Coding" %}</label>
+                        <div class="checkbox-group">
+                            {% for choice in form.medical_coding %}
+                                <div class="checkbox-item">
+                                    {{ choice.tag }}
+                                    <label for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Other Medical Coding" %}</label>
+                            {{ form.other_medical_coding }}
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Clinical Specialties" %}</label>
+                            {{ form.clinical_specialties }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Other Skills/Experience" %}</label>
+                            {{ form.other_skills_experience }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Work Desired -->
+                <div class="form-section">
+                    <h3>{% trans "Work Desired" %}</h3>
+                    
+                    <div class="form-group">
+                        <label class="oh-label">{% trans "Preferred Schedule" %}</label>
+                        <div class="checkbox-group">
+                            {% for choice in form.preferred_schedule %}
+                                <div class="checkbox-item">
+                                    {{ choice.tag }}
+                                    <label for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group full-width">
+                            <label class="oh-label">{% trans "Work Description" %}</label>
+                            {{ form.work_description }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Source Information -->
+                <div class="form-section">
+                    <h3>{% trans "Where did you learn about PSN?" %}</h3>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Source" %}</label>
+                            {{ form.how_heard_about_psn }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Personal Referral Name" %}</label>
+                            {{ form.personal_referral_name }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Questions -->
+                <div class="form-section">
+                    <h3>{% trans "Additional Questions" %}</h3>
+                    
+                    <div class="form-group">
+                        <div class="checkbox-item">
+                            {{ form.previous_psn_application }}
+                            <label for="{{ form.previous_psn_application.id_for_label }}">
+                                {% trans "Have you ever before filled out an employment application for PSN?" %}
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-item">
+                            {{ form.license_action_taken }}
+                            <label for="{{ form.license_action_taken.id_for_label }}">
+                                {% trans "Have you ever had, or have pending, action taken against your professional license or certificate in any state of the United States?" %}
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-item">
+                            {{ form.background_check_consent }}
+                            <label for="{{ form.background_check_consent.id_for_label }}">
+                                {% trans "Many of our clients require a criminal and/or educational background check, and for hospitals, etc. screen, proof of immunizations, including hepatitis B, negative TB test, etc. Are you willing to undergo a criminal background check and drug screen and obtain the above health information if requested?" %}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- References -->
+                <div class="form-section">
+                    <h3>{% trans "References" %}</h3>
+                    <p class="text-muted">{% trans "Please provide two references, preferably a Supervisor and a Professional. Your references will not be contacted until you have been offered AND accepted a position with PSN or one of its clients." %}</p>
+                    
+                    <h4>{% trans "Reference 1" %}</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Name" %}</label>
+                            {{ form.reference1_name }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Phone" %}</label>
+                            {{ form.reference1_phone }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Type" %}</label>
+                            {{ form.reference1_type }}
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Company" %}</label>
+                            {{ form.reference1_company }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Position" %}</label>
+                            {{ form.reference1_position }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Dates Worked Together" %}</label>
+                            {{ form.reference1_dates }}
+                        </div>
+                    </div>
+
+                    <h4>{% trans "Reference 2" %}</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Name" %}</label>
+                            {{ form.reference2_name }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Phone" %}</label>
+                            {{ form.reference2_phone }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Type" %}</label>
+                            {{ form.reference2_type }}
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Company" %}</label>
+                            {{ form.reference2_company }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Position" %}</label>
+                            {{ form.reference2_position }}
+                        </div>
+                        <div class="form-group">
+                            <label class="oh-label">{% trans "Dates Worked Together" %}</label>
+                            {{ form.reference2_dates }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Agreements -->
+                <div class="form-section">
+                    <h3>{% trans "Confidentiality Agreement & Employment Provisions" %}</h3>
+                    
+                    <div class="form-group">
+                        <div class="checkbox-item">
+                            {{ form.confidentiality_agreement }}
+                            <label for="{{ form.confidentiality_agreement.id_for_label }}" class="required-star">
+                                {% trans "I agree that I shall hold in strict confidence all information and materials provided to me during my interactions with Professional Services Network, Inc. (PSN) and its clients." %}
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-item">
+                            {{ form.employment_at_will }}
+                            <label for="{{ form.employment_at_will.id_for_label }}" class="required-star">
+                                {% trans "I acknowledge that this application is not meant to be a contract of employment and that my employment with PSN is AT WILL and may be terminated at any time without notice by either PSN or myself." %}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="form-section">
+                    <button type="submit" class="oh-btn oh-btn--primary">
+                        <ion-icon name="person-add-outline"></ion-icon>
+                        {% trans "Register Candidate" %}
+                    </button>
+                    <a href="{% url 'candidate-view' %}" class="oh-btn oh-btn--light ml-2">
+                        {% trans "Cancel" %}
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Document ready functions
+$(document).ready(function() {
+    // First, destroy any existing Select2 instances to prevent duplicates
+    $('select').each(function() {
+        if ($(this).hasClass('select2-hidden-accessible')) {
+            $(this).select2('destroy');
+        }
+    });
+    
+    // Now safely initialize Select2 on all select elements
+    $('select').select2({
+        theme: 'default',
+        width: '100%'
+    });
+    
+    // Initialize job position dropdown based on recruitment selection
+    $('[name="recruitment_id"]').change(function() {
+        const recruitmentId = $(this).val();
+        if (recruitmentId) {
+            // Update job position options based on selected recruitment
+            fetch(`/recruitment/recruitment-stage-get/${recruitmentId}/`)
+                .then(response => response.text())
+                .then(html => {
+                    // This would populate job positions - implement based on your existing logic
+                });
+        }
+    });
+});
+
+// Resume upload and auto-fill functionality
+function handleResumeUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    // Show loading indicator
+    const loadingDiv = document.getElementById('resume-parsing-status');
+    loadingDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Parsing resume...</div>';
+    loadingDiv.style.display = 'block';
+    
+    const formData = new FormData();
+    formData.append('resume', file);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+    fetch('{% url "parse-resume-ajax" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        loadingDiv.style.display = 'none';
+        
+        if (data.success && data.data) {
+            // Auto-populate form fields
+            autoFillFormFields(data.data);
+            
+            // Show success message
+            showMessage('Resume parsed successfully! Form fields have been auto-filled.', 'success');
+        } else {
+            showMessage(data.error || 'Failed to parse resume', 'error');
+        }
+    })
+    .catch(error => {
+        loadingDiv.style.display = 'none';
+        console.error('Error:', error);
+        showMessage('Error parsing resume', 'error');
+    });
+}
+
+function autoFillFormFields(data) {
+    // Basic candidate information
+    if (data.name) setFieldValue('name', data.name);
+    if (data.email) setFieldValue('email', data.email);
+    if (data.mobile) setFieldValue('mobile', data.mobile);
+    if (data.home_phone) setFieldValue('home_phone', data.home_phone);
+    if (data.work_phone) setFieldValue('work_phone', data.work_phone);
+    if (data.address) setFieldValue('address', data.address);
+    if (data.city) setFieldValue('city', data.city);
+    if (data.state) setFieldValue('state', data.state);
+    if (data.zip) setFieldValue('zip', data.zip);
+    if (data.country) setFieldValue('country', data.country);
+    if (data.portfolio) setFieldValue('portfolio', data.portfolio);
+    
+    // Education
+    if (data.education_degree) setSelectValue('education_degree', data.education_degree);
+    
+    // Licensure
+    if (data.licensure_type) setSelectValue('licensure_type', data.licensure_type);
+    if (data.license_number) setFieldValue('license_number', data.license_number);
+    if (data.license_state) setFieldValue('license_state', data.license_state);
+    
+    // Certifications
+    if (data.certifications && Array.isArray(data.certifications)) {
+        data.certifications.forEach(cert => {
+            setCheckboxValue('certifications', cert);
+        });
+    }
+    if (data.other_certification) setFieldValue('other_certification', data.other_certification);
+    
+    // Clinical Criteria
+    if (data.clinical_criteria && Array.isArray(data.clinical_criteria)) {
+        data.clinical_criteria.forEach(criteria => {
+            setCheckboxValue('clinical_criteria', criteria);
+        });
+    }
+    if (data.other_clinical) setFieldValue('other_clinical', data.other_clinical);
+    
+    // Computer Skills
+    if (data.computer_skills && Array.isArray(data.computer_skills)) {
+        data.computer_skills.forEach(skill => {
+            setCheckboxValue('computer_skills', skill);
+        });
+    }
+    if (data.other_computer_skills) setFieldValue('other_computer_skills', data.other_computer_skills);
+    
+    // Medical Coding
+    if (data.medical_coding && Array.isArray(data.medical_coding)) {
+        data.medical_coding.forEach(coding => {
+            setCheckboxValue('medical_coding', coding);
+        });
+    }
+    if (data.other_medical_coding) setFieldValue('other_medical_coding', data.other_medical_coding);
+    
+    // Skills and Experience
+    if (data.clinical_specialties) setFieldValue('clinical_specialties', data.clinical_specialties);
+    if (data.other_skills_experience) setFieldValue('other_skills_experience', data.other_skills_experience);
+    
+    // Work Preferences
+    if (data.preferred_schedule && Array.isArray(data.preferred_schedule)) {
+        data.preferred_schedule.forEach(schedule => {
+            setCheckboxValue('preferred_schedule', schedule);
+        });
+    }
+    if (data.work_description) setFieldValue('work_description', data.work_description);
+    
+    // References
+    if (data.reference1_name) setFieldValue('reference1_name', data.reference1_name);
+    if (data.reference1_phone) setFieldValue('reference1_phone', data.reference1_phone);
+    if (data.reference1_company) setFieldValue('reference1_company', data.reference1_company);
+    if (data.reference1_position) setFieldValue('reference1_position', data.reference1_position);
+    
+    if (data.reference2_name) setFieldValue('reference2_name', data.reference2_name);
+    if (data.reference2_phone) setFieldValue('reference2_phone', data.reference2_phone);
+    if (data.reference2_company) setFieldValue('reference2_company', data.reference2_company);
+    if (data.reference2_position) setFieldValue('reference2_position', data.reference2_position);
+}
+
+function setFieldValue(fieldName, value) {
+    const field = document.querySelector(`[name="${fieldName}"]`);
+    if (field && value) {
+        field.value = value;
+        // Trigger change event for any listeners
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+}
+
+function setSelectValue(fieldName, value) {
+    const field = document.querySelector(`[name="${fieldName}"]`);
+    if (field && value) {
+        // Try to match the value or find a close match
+        const options = field.options;
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].value === value || 
+                options[i].text.toLowerCase().includes(value.toLowerCase())) {
+                field.selectedIndex = i;
+                field.dispatchEvent(new Event('change', { bubbles: true }));
+                
+                // Trigger Select2 change event if this is a Select2 element
+                if ($(field).hasClass('select2-hidden-accessible')) {
+                    $(field).trigger('change');
+                }
+                break;
+            }
+        }
+    }
+}
+
+function setCheckboxValue(fieldName, value) {
+    const checkboxes = document.querySelectorAll(`[name="${fieldName}"]`);
+    checkboxes.forEach(checkbox => {
+        if (checkbox.value === value) {
+            checkbox.checked = true;
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+}
+
+function showMessage(message, type) {
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `alert ${alertClass} alert-dismissible fade show`;
+    messageDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    // Insert message at the top of the form
+    const form = document.querySelector('form');
+    form.insertBefore(messageDiv, form.firstChild);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (messageDiv.parentNode) {
+            messageDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock content %} 

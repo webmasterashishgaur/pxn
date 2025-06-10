@@ -1,0 +1,288 @@
+{% load i18n %}
+
+<div class="oh-modal__dialog-header">
+  <h5 class="oh-modal__dialog-title">{% trans "Edit Parsed Resume Details" %}</h5>
+  <button type="button" class="oh-modal__close" onclick="$(this).closest('.oh-modal').removeClass('oh-modal--show');">
+    <ion-icon name="close-outline"></ion-icon>
+  </button>
+</div>
+
+<div class="oh-modal__dialog-body" style="max-height: 80vh; overflow-y: auto; padding: 30px;">
+  <form id="parsedResumeEditForm" hx-post="{% url 'update-parsed-resume' candidate.id %}" hx-swap="none">
+    {% csrf_token %}
+    
+    <!-- Education Section -->
+    <div class="mb-5">
+      <div class="d-flex align-items-center mb-4">
+        <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
+          <ion-icon name="school-outline" class="text-white" style="font-size: 22px;"></ion-icon>
+        </div>
+        <h4 class="fw-bold mb-0 text-primary">{% trans "Education" %}</h4>
+      </div>
+      
+      <div id="educationSection">
+        {% for field in form %}
+          {% if 'education_' in field.name %}
+            <div class="card mb-4 border-0 shadow-sm">
+              <div class="card-body p-4">
+                <label class="form-label fw-bold text-secondary mb-3" style="font-size: 14px; text-transform: uppercase; letter-spacing: 0.8px;">
+                  {{ field.label }}
+                </label>
+                <div class="position-relative">
+                  {{ field }}
+                  {% if field.errors %}
+                    <div class="text-danger small mt-2">{{ field.errors }}</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Skills Section -->
+    <div class="mb-5">
+      <div class="d-flex align-items-center mb-4">
+        <div class="bg-success rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
+          <ion-icon name="build-outline" class="text-white" style="font-size: 22px;"></ion-icon>
+        </div>
+        <h4 class="fw-bold mb-0 text-success">{% trans "Skills" %}</h4>
+      </div>
+      
+      <div id="skillsSection">
+        <div class="row g-4">
+          {% for field in form %}
+            {% if 'skill_' in field.name %}
+              <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                  <div class="card-body p-4">
+                    <label class="form-label fw-bold text-secondary mb-3" style="font-size: 14px; text-transform: uppercase; letter-spacing: 0.8px;">
+                      {{ field.label }}
+                    </label>
+                    <div class="position-relative">
+                      {{ field }}
+                      {% if field.errors %}
+                        <div class="text-danger small mt-2">{{ field.errors }}</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Experience Section -->
+    <div class="mb-5">
+      <div class="d-flex align-items-center mb-4">
+        <div class="bg-info rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
+          <ion-icon name="briefcase-outline" class="text-white" style="font-size: 22px;"></ion-icon>
+        </div>
+        <h4 class="fw-bold mb-0 text-info">{% trans "Experience" %}</h4>
+      </div>
+      
+      <div id="experienceSection">
+        {% for field in form %}
+          {% if 'experience_' in field.name %}
+            <div class="card mb-4 border-0 shadow-sm">
+              <div class="card-body p-4">
+                <label class="form-label fw-bold text-secondary mb-3" style="font-size: 14px; text-transform: uppercase; letter-spacing: 0.8px;">
+                  {{ field.label }}
+                </label>
+                <div class="position-relative">
+                  {{ field }}
+                  {% if field.errors %}
+                    <div class="text-danger small mt-2">{{ field.errors }}</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Certifications Section -->
+    <div class="mb-5">
+      <div class="d-flex align-items-center mb-4">
+        <div class="bg-warning rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
+          <ion-icon name="ribbon-outline" class="text-white" style="font-size: 22px;"></ion-icon>
+        </div>
+        <h4 class="fw-bold mb-0 text-warning">{% trans "Certifications" %}</h4>
+      </div>
+      
+      <div id="certificationsSection">
+        <div class="row g-4">
+          {% for field in form %}
+            {% if 'certification_' in field.name %}
+              <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                  <div class="card-body p-4">
+                    <label class="form-label fw-bold text-secondary mb-3" style="font-size: 14px; text-transform: uppercase; letter-spacing: 0.8px;">
+                      {{ field.label }}
+                    </label>
+                    <div class="position-relative">
+                      {{ field }}
+                      {% if field.errors %}
+                        <div class="text-danger small mt-2">{{ field.errors }}</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Section -->
+    <div class="mb-5">
+      <div class="d-flex align-items-center mb-4">
+        <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px;">
+          <ion-icon name="document-text-outline" class="text-white" style="font-size: 22px;"></ion-icon>
+        </div>
+        <h4 class="fw-bold mb-0 text-secondary">{% trans "Summary" %}</h4>
+      </div>
+      
+      {% if form.summary %}
+        <div class="card border-0 shadow-sm">
+          <div class="card-body p-4">
+            <label class="form-label fw-bold text-secondary mb-3" style="font-size: 14px; text-transform: uppercase; letter-spacing: 0.8px;">
+              {% trans "Professional Summary" %}
+            </label>
+            <div class="position-relative">
+              {{ form.summary }}
+              {% if form.summary.errors %}
+                <div class="text-danger small mt-2">{{ form.summary.errors }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="d-flex justify-content-end gap-3 pt-4 border-top" style="margin-top: 40px;">
+      <button type="button" class="oh-btn oh-btn--secondary px-5 py-3" onclick="$(this).closest('.oh-modal').removeClass('oh-modal--show');">
+        <ion-icon name="close-outline" class="me-2"></ion-icon>
+        {% trans "Cancel" %}
+      </button>
+      <button type="submit" class="oh-btn oh-btn--primary px-5 py-3">
+        <ion-icon name="save-outline" class="me-2"></ion-icon>
+        {% trans "Save Changes" %}
+      </button>
+    </div>
+  </form>
+</div>
+
+<style>
+/* Auto-resize textareas */
+.form-control {
+  transition: all 0.3s ease;
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+.form-control:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+  transform: scale(1.01);
+}
+
+/* Ensure textareas expand properly */
+textarea.form-control {
+  overflow: hidden;
+  resize: vertical;
+  min-height: 50px;
+  width: 100% !important;
+  max-width: 100%;
+}
+
+/* Card hover effects */
+.card {
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
+}
+
+/* Better spacing for labels */
+.form-label {
+  margin-bottom: 12px !important;
+  color: #6c757d !important;
+}
+
+/* Improve button styling */
+.oh-btn {
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.oh-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Ensure full width for all form elements */
+.position-relative {
+  width: 100%;
+}
+
+.card-body {
+  width: 100%;
+}
+
+/* Remove any potential margin/padding issues */
+.form-control {
+  margin: 0;
+  padding: 15px;
+}
+</style>
+
+<script>
+// Auto-resize textareas based on content
+function autoResizeTextarea(textarea) {
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.max(50, textarea.scrollHeight) + 'px';
+}
+
+// Initialize auto-resize for all textareas
+document.addEventListener('DOMContentLoaded', function() {
+  const textareas = document.querySelectorAll('textarea.form-control');
+  
+  textareas.forEach(function(textarea) {
+    // Initial resize
+    autoResizeTextarea(textarea);
+    
+    // Resize on input
+    textarea.addEventListener('input', function() {
+      autoResizeTextarea(this);
+    });
+    
+    // Resize on focus (in case content was pasted)
+    textarea.addEventListener('focus', function() {
+      setTimeout(() => autoResizeTextarea(this), 100);
+    });
+  });
+});
+
+document.getElementById('parsedResumeEditForm').addEventListener('htmx:afterRequest', function(evt) {
+  if (evt.detail.successful) {
+    $(this).closest('.oh-modal').removeClass('oh-modal--show');
+    // Show success message
+    if (typeof showMessage === 'function') {
+      showMessage('{% trans "Resume details updated successfully!" %}', 'success');
+    }
+    // Reload the page to show updated data
+    setTimeout(() => {
+      location.reload();
+    }, 1000);
+  }
+});
+</script> 
