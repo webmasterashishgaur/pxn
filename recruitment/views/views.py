@@ -4723,3 +4723,374 @@ def candidate_registration_pdf_psn_format(request):
     response.write(pdf)
     
     return response
+
+def dynamic_resume_pdf(request):
+    """
+    Generate PDF of candidate resume in exact PSN sample format
+    """
+    from django.http import HttpResponse
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib import colors
+    from reportlab.platypus import Image
+    from io import BytesIO
+    from django.conf import settings
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    from django.utils.translation import gettext as _
+    import os
+    from datetime import datetime
+    
+    # Static data array - exactly same as sample PDF
+    resume_data = {
+        "name": "Nancy A. Nurse",
+        "date": "March 18, 2024",
+        "addressed_to": "Georgina",
+        "position": "Clinical Data Abstractor RN – Remote",
+        "on_behalf_of": "Hazel Brown-Patterson, RN",
+        "professional_summary": [
+            "14+ years Registered Nurse with Clinical Oncology experience",
+            "Provide symptom management support to patients managing adverse effects of chemotherapy and immunotherapy.",
+            "ONS Certification",
+            "3+ years Clinical Oncology Data Abstraction experience",
+            "Certified Tumor Registrar",
+            "Review oncology clinical documents for pertinent information related to diagnosis, treatment, and complications of cancer care.",
+            "Exercised meticulous attention to detail required when reviewing 1,000+ medical records per patient."
+        ],
+        "education": [
+            {
+                "degree": "Bachelor of Science in Nursing",
+                "institution": "Villa Julie College/Stevenson University, Stevenson, MD"
+            }
+        ],
+        "experience": [
+            {
+                "title": "Senior Technical Support Consultant, Clinical Application Support",
+                "company": "Altera Digital Health, Niagara Falls, New York",
+                "dates": "May 2023-Present",
+                "bullets": [
+                    "Tier 3 client/hospital support managing issues related to the sunrise electronic health record.",
+                    "Provided education to clients on product, assisted to troubleshoot issues, and process defects in the system for patches and upgrades.",
+                    "Experience using service now product for cases/tickets and SQL data management system."
+                ]
+            },
+            {
+                "title": "RN Care Management",
+                "company": "Florida Cancer Specialist, Fort Myers, Florida",
+                "dates": "October 2022-May 2023",
+                "bullets": [
+                    "Triage incoming calls from patients receiving treatment for hematologic or oncology diagnosis.",
+                    "Coordinate with MD/NP staff and clinic to facilitate scheduling of infusion, Lab, and follow up visits.",
+                    "Provide symptom management support to patients managing adverse effects of chemotherapy and immunotherapy.",
+                    "Answer questions related to disease process and educate on disease and treatments.",
+                    "Review imaging and lab results with patient and educate on MD recommendations.",
+                    "Follow up on patient needs in a timely and effective manner. Multitask and prioritize multiple calls and activities according to importance."
+                ]
+            },
+            {
+                "title": "RN-Data Abstraction specialist",
+                "company": "Concert AI, Memphis, Tennessee",
+                "dates": "November 2020-September 2022",
+                "bullets": [
+                    "Review oncology clinical documents for pertinent information related to diagnosis, treatment, and complications of cancer care.",
+                    "Exercised meticulous attention to detail required when reviewing 1,000+ medical records per patient.",
+                    "Accuracy scores consistently greater than 97% with speed consistently better than 75% of others in this role.",
+                    "Communicate frequently with team members and project leads regarding changes in project needs.",
+                    "Continuously excelled with working independently as evidenced by frequent request by management and leadership team to move to more difficult projects within the company."
+                ]
+            },
+            {
+                "title": "RN-Abstractor",
+                "company": "Flatiron Health, New York, New York",
+                "dates": "June 2019-October 2020",
+                "bullets": [
+                    "Review clinical documents for pertinent information as dictated by policy and procedures outlined by client's needs.",
+                    "Currently credentialed to abstract 10+ modules with \"A\" rating on quality and speed.",
+                    "Experience accessing multiple different records in a variety of hospital platforms.",
+                    "Communicate frequently with team leads regarding errors or complicated abstraction cases.",
+                    "Experience using outlook, citrix, and patient manager abstraction platform.",
+                    "Motivated independent worker with high score in efficiency and time management."
+                ]
+            },
+            {
+                "title": "Registered Nurse, Hospice and Palliative Care",
+                "company": "Gilchrist Hospice, Hunt Valley, MD",
+                "dates": "January 2016-October 2020",
+                "bullets": [
+                    "Home care case manager responsible for symptom and medical management of 12-15 patients.",
+                    "Responsibilities include medication management, communicating with doctors to obtain orders for symptom management, calling in medications to pharmacy, triaging phone calls, reviewing medical records, educating patients and families on care at end of life, and providing emotional support to families.",
+                    "Position requires exceptional organization and time management skills.",
+                    "Requires attention to detail and precise assessment skills to diagnose and manage patient issues."
+                ]
+            },
+            {
+                "title": "Registered Nurse-Oncology, Outpatient Services",
+                "company": "University of Maryland Medical Center",
+                "dates": "January 2013-January 2016",
+                "bullets": [
+                    "Assisted physicians with management of outpatient services including flowing doctor's clinic.",
+                    "Educated patients on chemotherapy side effects and expectations during treatment.",
+                    "Administered injections and infusions.",
+                    "Accessed ports for treatment and completed blood draws.",
+                    "Reviewed charts and medical records from outside facilities to assist physician with consults.",
+                    "Called in prescriptions.",
+                    "Triaged phone calls and assisted patients with symptom management.",
+                    "Complicated prior authorizations and forms to support patient's care/treatment.",
+                    "Required the ability to prioritize tasks and complete multiple different activities in a busy clinic setting to meet patient needs.",
+                    "Primarily used EPIC charting system."
+                ]
+            },
+            {
+                "title": "Registered Nurse- Oncology Leukemia/Lymphoma/Oncology ICU",
+                "company": "Johns Hopkins Hospital, Baltimore, MD",
+                "dates": "December 2010-January 2013",
+                "bullets": [
+                    "Provided inpatient care to patients diagnosed with cancer.",
+                    "Primary focus was blood cancers.",
+                    "Managed critically ill patients with various cancer diagnosis.",
+                    "Administered chemotherapy and managed side effects of treatment.",
+                    "Administered blood products as needed.",
+                    "Managed care in a fast paced constantly changing environment.",
+                    "Communicated and managed care with multiple levels of staff including residents, fellows, and attending providers."
+                ]
+            }
+        ],
+        "licensure_certifications": [
+            "Registered Nurse in the State of Maryland, active and unencumbered.",
+            "ONS Chemotherapy/Biotherapy Course",
+            "ONS Certification",
+            "Hospice and Palliative Care Certification",
+            "Certified Tumor Registrar"
+        ],
+        "coordinator_name": "Caitlin Whiteis",
+        "coordinator_email": "caitlinw@psninc.net",
+        "director_email": "mphipps@psninc.net",
+        "signature_name": "Michelle Phipps, EdD, MSA, BSN, RN",
+        "signature_title": "Director, Managed Care Services",
+        "signature_company": "Professional Services Network, Inc."
+    }
+    
+    def get_value(key, default="N/A"):
+        return resume_data.get(key) or default
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, 
+                           topMargin=40, bottomMargin=50)
+    
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # Custom styles for PSN format
+    header_style = ParagraphStyle(
+        'PSNHeader',
+        parent=styles['Normal'],
+        fontSize=11,
+        alignment=1,  # Center alignment
+        textColor=colors.black,
+        spaceAfter=6,
+        fontName='Helvetica-Bold'
+    )
+    
+    subheader_style = ParagraphStyle(
+        'PSNSubHeader',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=1,  # Center alignment
+        textColor=colors.black,
+        spaceAfter=6
+    )
+    
+    address_style = ParagraphStyle(
+        'PSNAddress',
+        parent=styles['Normal'],
+        fontSize=9,
+        alignment=1,  # Center alignment
+        textColor=colors.black
+    )
+    
+    title_style = ParagraphStyle(
+        'PSNTitle',
+        parent=styles['Heading1'],
+        fontSize=14,
+        spaceAfter=15,
+        alignment=0,  # Left alignment for name
+        textColor=colors.black,
+        fontName='Helvetica-Bold'
+    )
+    
+    # Header Section - Match Sample PDF exactly
+    try:
+        # Get logo from white label company or default
+        white_label_company = getattr(request, 'white_label_company', None)
+        
+        if white_label_company and hasattr(white_label_company, 'icon') and white_label_company.icon:
+            logo_path = white_label_company.icon.path
+        else:
+            # Fallback to static logo
+            logo_path = os.path.join(
+                settings.STATICFILES_DIRS[0] if settings.STATICFILES_DIRS else settings.STATIC_ROOT, 
+                'images/ui/auth-logo.png'
+            )
+        
+        # Create logo image with proper sizing
+        if os.path.exists(logo_path):
+            logo = Image(logo_path, width=1.2*inch, height=1.0*inch)
+        else:
+            # Fallback if logo not found
+            logo = Paragraph("[LOGO]", styles['Normal'])
+            
+    except Exception as e:
+        logo = Paragraph("[LOGO]", styles['Normal'])
+    
+    # Header table to match exact sample PDF layout
+    header_data = [
+        [logo, "", ""],
+        ["", "Specialists in Healthcare Recruitment & Staffing and", ""],
+        ["", "Accreditation Preparation Services since 1990", ""],
+        ["", "", ""],
+        ["402 King Farm Blvd., Suite 125-142", "•", "Rockville, MD 20850", "•", "Ph: 301-460-4089"]
+    ]
+    
+    # Precise column widths to match sample
+    header_table = Table(header_data, colWidths=[1.2*inch, 0.3*inch, 3.5*inch, 0.3*inch, 1.7*inch])
+    header_table.setStyle(TableStyle([
+        # Logo cell styling
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('VALIGN', (0, 0), (0, 0), 'TOP'),
+        ('SPAN', (0, 0), (0, 3)),  # Logo spans first 4 rows
+        
+        # Company name and tagline
+        ('ALIGN', (1, 1), (2, 2), 'CENTER'),
+        ('FONTNAME', (1, 1), (2, 1), 'Helvetica-Bold'),
+        ('FONTSIZE', (1, 1), (2, 1), 11),
+        ('FONTNAME', (1, 2), (2, 2), 'Helvetica'),
+        ('FONTSIZE', (1, 2), (2, 2), 10),
+        
+        # Address line
+        ('ALIGN', (0, 4), (-1, 4), 'CENTER'),
+        ('FONTNAME', (0, 4), (-1, 4), 'Helvetica'),
+        ('FONTSIZE', (0, 4), (-1, 4), 9),
+        ('VALIGN', (0, 4), (-1, 4), 'MIDDLE'),
+        
+        # Remove all borders
+        ('GRID', (0, 0), (-1, -1), 0, colors.white),
+        ('LINEBELOW', (0, 4), (-1, 4), 1, colors.black),  # Line under address
+    ]))
+    
+    story.append(header_table)
+    story.append(Spacer(1, 30))
+    
+    # Page 1 content
+    story.append(Paragraph(get_value("name"), title_style))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph(get_value("date"), styles['Normal']))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph(f"Dear {get_value('addressed_to')},", styles['Normal']))
+    story.append(Spacer(1, 12))
+    
+    # Introduction paragraph
+    intro_text = f"It is with {get_value('name')}, candidate for the position of {get_value('position')}, on behalf of {get_value('on_behalf_of')}."
+    story.append(Paragraph(intro_text, styles['Normal']))
+    story.append(Spacer(1, 15))
+    
+    # Professional Summary Section
+    story.append(Paragraph("PROFESSIONAL SUMMARY", styles['Heading2']))
+    story.append(Spacer(1, 10))
+    
+    for item in get_value("professional_summary", []):
+        story.append(Paragraph(f"• {item}", styles['Normal']))
+        story.append(Spacer(1, 6))
+    
+    story.append(Spacer(1, 15))
+    
+    # Contact information paragraph
+    contact_text = (f"If you are interested in speaking with this candidate, please let us know. "
+                   f"{get_value('coordinator_name')}, our Healthcare Project Coordinator will gladly assist "
+                   f"in making the arrangements with our candidate. Please feel free to contact us "
+                   f"({get_value('coordinator_email')} / {get_value('director_email')}), if you have any questions.")
+    story.append(Paragraph(contact_text, styles['Normal']))
+    story.append(Spacer(1, 12))
+    
+    story.append(Paragraph("We look forward to hearing from you.", styles['Normal']))
+    story.append(Spacer(1, 15))
+    
+    # Signature section
+    story.append(Paragraph("Regards,", styles['Normal']))
+    story.append(Spacer(1, 30))
+    
+    story.append(Paragraph("Michelle", styles['Normal']))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph(get_value('signature_name'), styles['Normal']))
+    story.append(Paragraph(get_value('signature_title'), styles['Normal']))
+    story.append(Paragraph(get_value('signature_company'), styles['Normal']))
+    
+    # Page break for page 2
+    story.append(PageBreak())
+    
+    # Page 2 - Start with name again
+    story.append(Paragraph(get_value("name"), title_style))
+    story.append(Spacer(1, 20))
+    
+    # Education Section
+    story.append(Paragraph("EDUCATION", styles['Heading2']))
+    story.append(Spacer(1, 10))
+    
+    for edu in get_value("education", []):
+        story.append(Paragraph(f"• {edu.get('degree', 'N/A')}", styles['Normal']))
+        story.append(Paragraph(f"  {edu.get('institution', 'N/A')}", styles['Normal']))
+        story.append(Spacer(1, 8))
+    
+    story.append(Spacer(1, 15))
+    
+    # Professional Experience Section
+    story.append(Paragraph("PROFESSIONAL EXPERIENCE", styles['Heading2']))
+    story.append(Spacer(1, 10))
+    
+    for exp in get_value("experience", []):
+        # Job title and company
+        story.append(Paragraph(f"{exp.get('title', 'N/A')}", styles['Normal']))
+        story.append(Paragraph(f"{exp.get('company', 'N/A')}", styles['Normal']))
+        story.append(Spacer(1, 6))
+        story.append(Paragraph(f"  {exp.get('dates', 'N/A')}", styles['Normal']))
+        story.append(Spacer(1, 8))
+        
+        # Bullet points
+        for bullet in exp.get('bullets', []):
+            story.append(Paragraph(f"• {bullet}", styles['Normal']))
+            story.append(Spacer(1, 4))
+        
+        story.append(Spacer(1, 15))
+    
+    # New page for last section
+    story.append(PageBreak())
+    
+    # Page 4 - Name at top
+    story.append(Paragraph(get_value("name"), title_style))
+    story.append(Spacer(1, 20))
+    
+    # Licensure & Certifications Section
+    story.append(Paragraph("LICENSURE & CERTIFICATIONS", styles['Heading2']))
+    story.append(Spacer(1, 10))
+    
+    for cert in get_value("licensure_certifications", []):
+        story.append(Paragraph(f"• {cert}", styles['Normal']))
+        story.append(Spacer(1, 6))
+    
+    # Build PDF
+    doc.build(story)
+    
+    # Get the value of the BytesIO buffer and write it to the response
+    pdf = buffer.getvalue()
+    buffer.close()
+    
+    response = HttpResponse(content_type='application/pdf')
+    
+    # Safe filename generation
+    name = get_value("name", "unknown")
+    safe_name = name.replace(" ", "_").replace("/", "_").replace("\\", "_")
+    response['Content-Disposition'] = f'attachment; filename="PSN_Resume_{safe_name}.pdf"'
+    response.write(pdf)
+    
+    return response

@@ -1,14 +1,99 @@
 {% extends 'candidate/application_form_component.html' %} {% block content %}
 {% load static %} {% load i18n %} {{form.load}}
+
+<style>
+    select.form-control, input.form-control, select.oh-input, input.oh-input, select.oh-select, input.oh-select {
+        border: 1px solid hsl(213,22%,84%) !important;
+        border-radius: 0rem !important;
+        padding: 0.8rem 1.25rem !important;
+        color: hsl(0,0%,11%) !important;
+        font-size: 1rem !important;
+        background-color: #fff !important;
+        box-sizing: border-box !important;
+        display: block !important;
+        width: 100% !important;
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        -moz-appearance: none !important;
+        min-height: 48px !important;
+        line-height: 1.5 !important;
+    }
+    .form-section {
+        padding-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1)
+    }
+    .form-section h3 {
+        color: #2c5282;
+        background: #e6f3ff;
+        padding: 10px 15px;
+        margin-top: 20px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: bold;
+    }
+    .form-section h6{
+          padding: 10px 20px;
+    border-bottom: 2px solid #ccc;
+    }
+    .form-row {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+    .form-group {
+        flex: 1;
+        min-width: 0;
+    }
+    .form-group.full-width {
+        flex: 2;
+    }
+    .checkbox-group {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .required-star::after {
+        content: " *";
+        color: red;
+    }
+    .upload-area {
+        border: 2px dashed #cbd5e0;
+        border-radius: 8px;
+        padding: 40px;
+        text-align: center;
+        background: #f7fafc;
+        cursor: pointer;
+        transition: border-color 0.3s;
+    }
+    .upload-area:hover {
+        border-color: #4299e1;
+    }
+    .upload-area.dragover {
+        border-color: #3182ce;
+        background: #ebf8ff;
+    }
+    .parsed-data {
+        background: #f0fff4;
+        border: 1px solid #9ae6b4;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 15px;
+    }
+</style>
+
 <div id="main">
   <div class="oh-wrapper mt-5">
     <div class="row">
       <div class="col-12 col-md-6 col-lg-6">
         <div class="oh-onboarding-card oh-onboarding-card--top-bar w-100">
-          <div
-            class="oh-onboarding-card__container oh-onboarding-card__container--wide"
-          >
-            <form action="" method="post" enctype="multipart/form-data">
+          <div class="oh-wrapper">
+            <form action=""  method="post" enctype="multipart/form-data">
               {% if messages %}
               <div class="oh-alert-container">
                 {% for message in messages %}
@@ -17,304 +102,630 @@
                 </div>
                 {% endfor %}
               </div>
-              {% endif %} {% csrf_token %}
+              {% endif %} 
+              {% csrf_token %}
+              
               <div class="row">
-                <div
-                  class="oh-modal"
-                  id="uploadPhotoModal"
-                  role="dialog"
-                  aria-labelledby="uploadPhotoModal"
-                  aria-hidden="true"
-                >
-                  <div class="oh-modal__dialog">
-                    <div class="oh-modal__dialog-header">
-                      <span
-                        class="oh-modal__dialog-title"
-                        id="uploadPhotoModalLabel"
-                        >Upload Photo</span
-                      >
-                      <button
-                        type="button"
-                        onclick="event.stopPropagation()"
-                        class="oh-modal__close"
-                        aria-label="Close"
-                      >
-                        <ion-icon name="close-outline"></ion-icon>
-                      </button>
-                    </div>
-                    <div class="oh-modal__dialog-body">
-                      <div class="oh-profile-section__image-container">
-                        <div class="oh-profile-section__modal-avatar">
-                          <img
-                            src="{% static "/images/ui/user.jpg" %}"
-                            class="oh-profile-section__modal-image oh-upload-photo"
-                            alt="User Photo"
-                          />
+                <div class="oh-card__header">
+                    <h2 class="oh-card__title">Register Candidate</h2>
+                </div>
+
+                 <div class="form-section">
+                  <div class="row">
+                    <h3>Personal Information</h3>
+                        <!-- Profile Photo Modal -->
+                        <div class="oh-modal" id="uploadPhotoModal" role="dialog" aria-labelledby="uploadPhotoModal" aria-hidden="true">
+                          <div class="oh-modal__dialog">
+                            <div class="oh-modal__dialog-header">
+                              <span class="oh-modal__dialog-title" id="uploadPhotoModalLabel">Upload Photo</span>
+                              <button type="button" onclick="event.stopPropagation()" class="oh-modal__close" aria-label="Close">
+                                <ion-icon name="close-outline"></ion-icon>
+                              </button>
+                            </div>
+                            <div class="oh-modal__dialog-body">
+                              <div class="oh-profile-section__image-container">
+                                <div class="oh-profile-section__modal-avatar">
+                                  <img src="{% static "/images/ui/user.jpg" %}" class="oh-profile-section__modal-image oh-upload-photo" alt="User Photo"/>
+                                </div>
+                                <input type="file" id="photo" name="profile" class="oh-input oh-input--file oh-input--file-sm mt-4 oh-upload-input" accept=".jpg, .jpeg, .png" data-target=".oh-upload-photo"/>
+                                <div class="d-flex justify-content-between w-100 align-items-center mt-4">
+                                  <button class="oh-btn oh-btn--light-danger mr-1 oh-remove-image" data-target=".oh-upload-photo">
+                                    <ion-icon class="me-1" name="trash-outline"></ion-icon>
+                                    {% trans "Delete image" %}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <input
-                          type="file"
-                          id="photo"
-                          name="profile"
-                          class="oh-input oh-input--file oh-input--file-sm mt-4 oh-upload-input"
-                          accept=".jpg, .jpeg, .png"
-                          data-target=".oh-upload-photo"
-                        />
-                        <div
-                          class="d-flex justify-content-between w-100 align-items-center mt-4"
-                        >
-                          <button
-                            class="oh-btn oh-btn--light-danger mr-1 oh-remove-image"
-                            data-target=".oh-upload-photo"
-                          >
-                            <ion-icon
-                              class="me-1"
-                              name="trash-outline"
-                            ></ion-icon
-                            >{% trans "Delete image" %}
-                          </button>
+
+                        <!-- Profile Photo -->
+                        <div class="col-sm-12 col-md-2 col-lg-2">
+                          <div class="oh-profile-section__edit-photo me-4 mb-3" data-toggle="oh-modal-toggle" data-target="#uploadPhotoModal">
+                            <img src="{% static "/images/ui/user.jpg" %}" class="oh-profile-section__avatar oh-upload-photo" alt=""/>
+                          </div>
+                        </div>
+                        {{form.profile.errors}}
+
+                        <!-- Basic Information -->
+                        <div class="col-sm-12 col-md-12 col-lg-12">
+                          <div class="oh-input-group">
+                            <label class="oh-label required-star" for="name">{% trans "Name" %}</label>
+                            <input type="text" id="name" name="name" required maxlength="100" class="oh-input w-100" placeholder="e.g. Jane Doe"/>
+                            {{form.name.errors}}
+                          </div>
+                        </div>
+
+                        {% if not request.GET.recruitmentId %}
+                        <div class="col-sm-12 col-md-6 col-lg-6">
+                          <div class="oh-input-group">
+                            <label class="oh-label required-star" for="recruitment">{% trans "Open Recruitment" %}</label>
+                            {{form.recruitment_id}} {{form.recruitment_id.errors}}
+                          </div>
+                        </div>
+                        <div class="col-sm-12 col-md-6 col-lg-6">
+                          <div class="oh-input-group">
+                            <label class="oh-label required-star" for="job_position">{% trans "Choose Open Position" %}</label>
+                            {{form.job_position_id}} {{form.job_position_id.errors}}
+                          </div>
+                        </div>
+                        {% else %}
+                        <input type="text" name="recruitment_id" hidden value="{{recruitment.id}}"/>
+                        <div class="oh-input-group">
+                          <label class="oh-label" for="job_position">{% trans "Choose Job Position" %}</label>
+                          <select name="job_position_id" class="oh-select oh-select2 w-100" style="height: 50px">
+                            {% for job in recruitment.open_positions.all %}
+                            <option value="{{job.id}}">{{job.job_position}}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                        {% endif %}
+
+                        <!-- Contact Information -->
+                        <div class="col-sm-12 col-md-6 col-lg-6">
+                          <div class="oh-input-group">
+                            <label class="oh-label required-star" for="email">{% trans "Email" %}</label>
+                            <input type="email" id="email" name="email" class="oh-input w-100" required placeholder="e.g. janedoe@example.com"/>
+                            {{form.email.errors}}
+                          </div>
+                        </div>
+
+                        <div class="col-sm-12 col-md-6 col-lg-6">
+                          <div class="oh-input-group">
+                            <label class="oh-label required-star" for="mobile">{% trans "Cell Phone" %}</label>
+                            <input type="text" id="mobile" class="oh-input w-100" name="mobile" required placeholder="e.g. +1 245 999 999"/>
+                            {{form.mobile.errors}}
+                          </div>
+                        </div>
+
+                        <!-- Additional Phone Numbers -->
+                        <div class="col-sm-12 col-md-6 col-lg-6">
+                          <div class="oh-input-group">
+                            <label class="oh-label" for="home_phone">{% trans "Home Phone" %}</label>
+                            <input type="text" id="home_phone" name="home_phone" class="oh-input w-100" placeholder="e.g. +1 245 888 888"/>
+                          </div>
+                        </div>
+
+                        <div class="col-sm-12 col-md-6 col-lg-6">
+                          <div class="oh-input-group">
+                            <label class="oh-label" for="work_phone">{% trans "Work Phone" %}</label>
+                            <input type="text" id="work_phone" name="work_phone" class="oh-input w-100" placeholder="e.g. +1 245 777 777"/>
+                          </div>
+                        </div>
+
+                        <!-- Contact Preferences -->
+                        <div class="col-sm-12 col-md-6 col-lg-6">
+                          <div class="oh-input-group">
+                            <label class="oh-label" for="preferred_contact_method">{% trans "Preferred Contact Method" %}</label>
+                            <select id="preferred_contact_method" name="preferred_contact_method" class="oh-select oh-select2 w-100">
+                              <option value="">Select Contact Method</option>
+                              <option value="email">Email</option>
+                              <option value="phone">Phone</option>
+                              <option value="text">Text Message</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div class="col-sm-12 col-md-6 col-lg-6">
+                          <div class="oh-input-group">
+                            <label class="oh-label" for="preferred_contact_time">{% trans "Preferred Contact Time" %}</label>
+                            <select id="preferred_contact_time" name="preferred_contact_time" class="oh-select oh-select2 w-100">
+                              <option value="">Select Time</option>
+                              <option value="morning">Morning</option>
+                              <option value="afternoon">Afternoon</option>
+                              <option value="evening">Evening</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <!-- Basic Details -->
+                        <div class="col-sm-12 col-md-6 col-lg-6">
+                          <div class="oh-input-group">
+                            <label class="oh-label" for="portfolio">{% trans "Portfolio" %}</label>
+                            <input type="text" id="portfolio" name="portfolio" class="oh-input w-100" placeholder="e.g. https://www.linktoportfolio.com/"/>
+                            {{form.portfolio.errors}}
+                          </div>
+                        </div>
+
+                        
+
+                        <div class="col-sm-12 col-md-6 col-lg-6">
+                          <div class="oh-input-group">
+                            <label class="oh-label required-star" for="gender">{% trans "Gender" %}</label>
+                            {{form.gender}} {{form.gender.errors}}
+                          </div>
+                        </div>
+                  </div>
+                </div>
+
+                <div class="form-section">
+                  <h3>Resume Upload</h3>
+
+                  <div class="col-sm-12 col-md-12 col-lg-12">
+                    <div class="oh-input-group">
+                      <label class="oh-label" for="resume">{% trans "Resume" %}</label>
+                      {% if resume.file %}
+                      <p>Currently: <a href="{{ resume.file.url }}" target="_blank">{{ resume.file.name }}</a></p>
+                      <p>Change:</p>
+                      <input type="hidden" id="matching_resume" data-value="{{ resume.file.url }}" data-id="{{resume.id}}" name="initial_resume" value="{{ resume.file.url }}">
+                      {% endif %}
+                      <input type="file" id="id_resume" name="resume" accept=".pdf" class="oh-input w-100 px-0"/>
+                      {{form.resume.errors}}
+                    </div>
+                  </div>
+                </div>
+
+
+                 <div class="form-section">
+                  <h3>Applicant Address</h3>
+                  <div class="row">
+                        <!-- Address Information -->
+                        <div class="col-sm-12 col-md-12 col-lg-12">
+                          <div class="oh-input-group">
+                            <label class="oh-label required-star" for="address">{% trans "Address" %}</label>
+                            <textarea id="address" name="address" required class="oh-input oh-input--textarea w-100"></textarea>
+                            {{form.address.errors}}
+                          </div>
+                        </div>
+
+                        <div class="col-sm-12 col-md-6 col-lg-6">
+                          <div class="oh-input-group">
+                            <label class="oh-label required-star" for="id_country">{% trans "Country" %}</label>
+                            <select name="country" id="id_country" required class="oh-select oh-select-2"></select>
+                            {{form.country.errors}}
+                          </div>
+                        </div>
+
+                        <div class="col-sm-12 col-md-6 col-lg-6">
+                          <div class="oh-input-group">
+                            <label class="oh-label required-star" for="id_state">{% trans "State" %}</label>
+                            <select name="state" required id="id_state" class="oh-select oh-select-2"></select>
+                            {{form.state.errors}}
+                          </div>
+                        </div>
+
+                        <div class="col-sm-12 col-md-6 col-lg-6">
+                          <div class="oh-input-group">
+                            <label class="oh-label required-star" for="city">{% trans "City" %}</label>
+                            <input type="text" id="city" required name="city" class="oh-input w-100" placeholder="e.g. Kerala"/>
+                            {{form.city.errors}}
+                          </div>
+                        </div>
+
+                        <div class="col-sm-12 col-md-6 col-lg-6">
+                          <div class="oh-input-group">
+                            <label class="oh-label required-star" for="zip">{% trans "Zip Code" %}</label>
+                            <input type="text" id="zip" required name="zip" class="oh-input w-100" placeholder="e.g. 611 293"/>
+                            {{form.zip.errors}}
+                          </div>
+                        </div>
+
+                         <div class="form-row">
+                            <div class="form-group">
+                                <label class="oh-label">{% trans "Best way to contact you" %}</label>
+                                {{ form.preferred_contact_method }}
+                            </div>
+                            <div class="form-group">
+                                <label class="oh-label">{% trans "Preferred time of day" %}</label>
+                                {{ form.preferred_contact_time }}
+                            </div>
+                        </div>
+
+                 </div>
+                </div>       
+
+                
+                <!-- Education & Licensure Section -->
+                <div class="form-section">
+                  <h3>{% trans "Education & Licensure" %}</h3>
+                  <div class="row">
+
+                      <div class="col-sm-12 col-md-6 col-lg-6">
+                        <div class="oh-input-group">
+                          <label class="oh-label" for="education_degree">{% trans "Education Degree" %}</label>
+                          <select id="education_degree" name="education_degree" class="oh-select oh-select2 w-100">
+                            <option value="">Select Degree</option>
+                            <option value="hospital_diploma">Hospital Diploma</option>
+                            <option value="associate">Associate Degree</option>
+                            <option value="bachelor">Bachelor's Degree</option>
+                            <option value="master">Master's Degree</option>
+                            <option value="doctorate">Doctorate Degree</option>
+                          </select>
                         </div>
                       </div>
+
+                      <div class="col-sm-12 col-md-6 col-lg-6">
+                        <div class="oh-input-group">
+                          <label class="oh-label" for="licensure_type">{% trans "Licensure Type" %}</label>
+                          <select id="licensure_type" name="licensure_type" class="oh-select oh-select2 w-100">
+                            <option value="">Select License Type</option>
+                            <option value="rn">RN</option>
+                            <option value="lpn">LPN</option>
+                            <option value="md">MD</option>
+                            <option value="sw">SW</option>
+                            <option value="other">Other</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div class="col-sm-12 col-md-6 col-lg-6">
+                        <div class="oh-input-group">
+                          <label class="oh-label" for="license_number">{% trans "License Number" %}</label>
+                          <input type="text" id="license_number" name="license_number" class="oh-input w-100" placeholder="Enter license number"/>
+                        </div>
+                      </div>
+
+                      <div class="col-sm-12 col-md-6 col-lg-6">
+                        <div class="oh-input-group">
+                          <label class="oh-label" for="license_state">{% trans "License State" %}</label>
+                          <input type="text" id="license_state" name="license_state" class="oh-input w-100" placeholder="State where license was issued"/>
+                        </div>
+                      </div>
+
+                  </div>
+                </div>
+                     <div class="form-section">
+                  <h3>{% trans "Certifications" %}</h3>
+                  <div class="row">
+
+
+
+                    <div class="col-sm-12 col-md-6 col-lg-6">
+                      <div class="oh-input-group">
+                        <label class="oh-label" for="certifications">{% trans "Certifications" %}</label>
+                        <select id="certifications" name="certifications" class="oh-select oh-select2 w-100" multiple>
+                          <option value="ccm">CCM</option>
+                          <option value="cpho">CPHO</option>
+                          <option value="chm">CHM</option>
+                          <option value="cpur">CPUR</option>
+                          <option value="cphm">CPHM</option>
+                          <option value="coding">Coding</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="col-sm-12 col-md-6 col-lg-6">
+                      <div class="oh-input-group">
+                        <label class="oh-label" for="other_certification">{% trans "Other Certifications" %}</label>
+                        <input type="text" id="other_certification" name="other_certification" class="oh-input w-100" placeholder="Other certifications"/>
+                      </div>
+                    </div>
+
+                     </div>
+                </div>
+                     <div class="form-section">
+                  <h3>{% trans "Skills & Experience" %}</h3>
+                  <div class="row">
+                    <!-- Skills & Experience Section -->
+                    
+
+                    <div class="col-sm-12 col-md-6 col-lg-6">
+                      <div class="oh-input-group">
+                        <label class="oh-label" for="clinical_criteria">{% trans "Clinical Criteria" %}</label>
+                        <select id="clinical_criteria" name="clinical_criteria" class="oh-select oh-select2 w-100" multiple>
+                          <option value="interqual">InterQual</option>
+                          <option value="milliman">Milliman</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="col-sm-12 col-md-6 col-lg-6">
+                      <div class="oh-input-group">
+                        <label class="oh-label" for="other_clinical">{% trans "Other Clinical" %}</label>
+                        <input type="text" id="other_clinical" name="other_clinical" class="oh-input w-100" placeholder="Other clinical criteria"/>
+                      </div>
+                    </div>
+
+                    <div class="col-sm-12 col-md-6 col-lg-6">
+                      <div class="oh-input-group">
+                        <label class="oh-label" for="computer_skills">{% trans "Computer Skills" %}</label>
+                        <select id="computer_skills" name="computer_skills" class="oh-select oh-select2 w-100" multiple>
+                          <option value="ms_excel">MS Excel</option>
+                          <option value="ms_word">MS Word</option>
+                          <option value="ms_access">MS Access</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="col-sm-12 col-md-6 col-lg-6">
+                      <div class="oh-input-group">
+                        <label class="oh-label" for="other_computer_skills">{% trans "Other Computer Skills" %}</label>
+                        <input type="text" id="other_computer_skills" name="other_computer_skills" class="oh-input w-100" placeholder="Other computer skills"/>
+                      </div>
+                    </div>
+
+                    <div class="col-sm-12 col-md-6 col-lg-6">
+                      <div class="oh-input-group">
+                        <label class="oh-label" for="medical_coding">{% trans "Medical Coding" %}</label>
+                        <select id="medical_coding" name="medical_coding" class="oh-select oh-select2 w-100" multiple>
+                          <option value="icd_10">ICD-10</option>
+                          <option value="hcpc">HCPC</option>
+                          <option value="cpt">CPT</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="col-sm-12 col-md-6 col-lg-6">
+                      <div class="oh-input-group">
+                        <label class="oh-label" for="other_medical_coding">{% trans "Other Medical Coding" %}</label>
+                        <input type="text" id="other_medical_coding" name="other_medical_coding" class="oh-input w-100" placeholder="Other medical coding"/>
+                      </div>
+                    </div>
+
+                    <div class="col-sm-12 col-md-12 col-lg-12">
+                      <div class="oh-input-group">
+                        <label class="oh-label" for="clinical_specialties">{% trans "Clinical Specialties" %}</label>
+                        <textarea id="clinical_specialties" name="clinical_specialties" class="oh-input oh-input--textarea w-100" placeholder="Describe your clinical specialties"></textarea>
+                      </div>
+                    </div>
+
+                    <div class="col-sm-12 col-md-12 col-lg-12">
+                      <div class="oh-input-group">
+                        <label class="oh-label" for="other_skills_experience">{% trans "Other Skills/Experience" %}</label>
+                        <textarea id="other_skills_experience" name="other_skills_experience" class="oh-input oh-input--textarea w-100" placeholder="Other applicable skills and experience"></textarea>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
+
+
+
+  
+                <div class="form-section">
+                  <h3>{% trans "Work Preferences" %}</h3>
+                  <div class="row">
+                      <!-- Work Preferences Section -->
+                      <div class="col-sm-12 col-md-6 col-lg-6">
+                        <div class="oh-input-group">
+                          <label class="oh-label" for="preferred_schedule">{% trans "Preferred Schedule" %}</label>
+                          <select id="preferred_schedule" name="preferred_schedule" class="oh-select oh-select2 w-100" multiple>
+                            <option value="full_time">Full-Time</option>
+                            <option value="part_time">Part-Time</option>
+                            <option value="direct_hire">Direct Hire</option>
+                            <option value="temporary">Temporary Assignment</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div class="col-sm-12 col-md-12 col-lg-12">
+                        <div class="oh-input-group">
+                          <label class="oh-label" for="work_description">{% trans "Work Description" %}</label>
+                          <textarea id="work_description" name="work_description" class="oh-input oh-input--textarea w-100" placeholder="Describe the kind of work/setting you seek"></textarea>
+                        </div>
+                      </div>
+                  </div>
+                </div>
+
+
+                <div class="form-section">
+                  <h3>{% trans "How Did You Learn About PSN?" %}</h3>
+                  <div class="row">
+                <!-- How Did You Learn About Us Section -->
+              
+
+                  <div class="col-sm-12 col-md-6 col-lg-6">
+                    <div class="oh-input-group">
+                      <label class="oh-label" for="how_heard_about_psn">{% trans "Source" %}</label>
+                      <select id="how_heard_about_psn" name="how_heard_about_psn" class="oh-select oh-select2 w-100">
+                        <option value="">Select Source</option>
+                        <option value="search_engine">Search Engine (e.g., Google)</option>
+                        <option value="psn_website">PSN Website</option>
+                        <option value="indeed">Indeed</option>
+                        <option value="linkedin">LinkedIn</option>
+                        <option value="personal_referral">Personal Referral</option>
+                      </select>
                     </div>
                   </div>
-                </div>
-                <div class="col-sm-12 col-md-2 col-lg-2">
-                  <div
-                    class="oh-profile-section__edit-photo me-4 mb-3"
-                    data-toggle="oh-modal-toggle"
-                    data-target="#uploadPhotoModal"
-                  >
-                    <img
-                      src="{% static "/images/ui/user.jpg" %}"
-                      class="oh-profile-section__avatar oh-upload-photo"
-                      alt=""
-                    />
+
+                  <div class="col-sm-12 col-md-6 col-lg-6">
+                    <div class="oh-input-group">
+                      <label class="oh-label" for="personal_referral_name">{% trans "Personal Referral Name" %}</label>
+                      <input type="text" id="personal_referral_name" name="personal_referral_name" class="oh-input w-100" placeholder="Name of person who referred you"/>
+                    </div>
                   </div>
+
+                 </div>
                 </div>
-                {{form.profile.errors}}
-                {% comment %} <ul id="error-list" class="errorlist" style="display: none">
-                  <li>{% trans "Please select profile image" %}.</li>
-                </ul> {% endcomment %}
+
+                <!-- Additional Questions Section -->
+
+                 <div class="form-section">
+                  <h3>{% trans "Additional Questions" %}</h3>
+                  <div class="row">
+                
+
                 <div class="col-sm-12 col-md-12 col-lg-12">
                   <div class="oh-input-group">
-                    <label class="oh-label required-star" for="name"
-                      >{% trans "Name" %}</label
-                    >
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      required
-                      maxlength="100"
-                      class="oh-input w-100"
-                      placeholder="e.g. Jane Doe"
-                    />
-                    {{form.name.errrors}}
-                  </div>
-                </div>
-
-                {% if not request.GET.recruitmentId %}
-                <div class="col-sm-12 col-md-6 col-lg-6">
-                  <div class="oh-input-group">
-                    <label class="oh-label required-star" for="recuitment"
-                      > {% trans "Open Recruitment" %}
+                    <label class="oh-label" for="previous_psn_application">
+                      <input type="checkbox" id="previous_psn_application" name="previous_psn_application" value="true"/>
+                      {% trans "Have you ever before filled out an employment application for PSN?" %}
                     </label>
-                    {{form.recruitment_id}} {{form.recruitment_id.errors}}
-                  </div>
-                </div>
-                <div class="col-sm-12 col-md-6 col-lg-6">
-                  <div class="oh-input-group">
-                    <label class="oh-label required-star" for="recuitment"
-                      >{% trans "Choose Open Position" %}
-                    </label>
-                    {{form.job_position_id}} {{form.job_position_id.errors}}
-                  </div>
-                </div>
-                {% else %}
-                <input
-                  type="text"
-                  name="recruitment_id"
-                  hidden
-                  value="{{recruitment.id}}"
-                />
-                <div class="oh-input-group">
-                  <label class="oh-label" for="recuitment"
-                    >{% trans "Choose Job Position" %}
-                  </label>
-
-                  <select
-                    name="job_position_id"
-                    class="oh-select oh-select2 w-100"
-                    style="height: 50px"
-                  >
-                    {% for job in recruitment.open_positions.all %}
-                    <option value="{{job.id}}">{{job.job_position}}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-                {% endif %}
-
-                <div class="col-sm-12 col-md-6 col-lg-6">
-                  <div class="oh-input-group">
-                    <label class="oh-label required-star" for="email"
-                      >{% trans "Email" %}</label
-                    >
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      class="oh-input w-100"
-                      required
-                      placeholder="e.g. janedoe@example.com"
-                    />
-                  </div>
-                  {{form.email.errors}}
-                </div>
-
-                <div class="col-sm-12 col-md-6 col-lg-6">
-                  <div class="oh-input-group">
-                    <label class="oh-label required-star" for="phone"
-                      >{% trans "Phone" %}</label
-                    >
-                    <input
-                      type="text"
-                      id="phone"
-                      class="oh-input w-100"
-                      name="mobile"
-                      required
-                      placeholder="e.g. +1 245 999 999"
-                    />
-                    {{form.mobile.errors}}
-                  </div>
-                </div>
-                <div class="col-sm-12 col-md-6 col-lg-6">
-                  <div class="oh-input-group">
-                    <label class="oh-label" for="portfolio"
-                      >{% trans "Portfolio" %}</label
-                    >
-                    <input
-                      type="text"
-                      id="portfolio"
-                      name="portfolio"
-                      class="oh-input w-100"
-                      placeholder="e.g. https://www.linktoportfolio.com/"
-                    />
-                    {{form.portfolio.errors}}
-                  </div>
-                </div>
-
-                <div class="col-sm-12 col-md-12 col-lg-6">
-                  <div class="oh-input-group">
-                    <label class="oh-label" for="resume"
-                      >{% trans "Resume" %}</label
-                    >
-                    {% if resume.file %}
-                        <p>Currently: <a href="{{ resume.file.url }}" target="_blank">{{ resume.file.name }}</a></p>
-                        <p>Change: </p>
-                        <input type="hidden" id="matching_resume" data-value = "{{ resume.file.url }}" data-id="{{resume.id}}" name="initial_resume" value="{{ resume.file.url }}">
-                        {% endif %}
-                    <input
-                      type="file"
-                      id="id_resume"
-                      name="resume"
-                      accept=".pdf"
-                      class="oh-input w-100 px-0"
-                    />
-                    {{form.resume.errors}}
-                  </div>
-                </div>
-                <div class="col-sm-12 col-md-6 col-lg-6">
-                  <div class="oh-input-group">
-                    <label class="oh-label required-star" for="gender"
-                      >{% trans "Gender" %}</label
-                    >
-                    {{form.gender}} {{form.gender.errros}}
-                  </div>
-                </div>
-                <div class="col-sm-12 col-md-6 col-lg-12">
-                  <div class="oh-input-group">
-                    <label class="oh-label required-star" for="address"
-                      >{% trans "Address" %}</label
-                    >
-                    <textarea
-                      id="address"
-                      name="address"
-                      required
-                      class="oh-input oh-input--textarea w-100"
-                    ></textarea>
-                    {{form.address.errors}}
-                  </div>
-                </div>
-
-                <div class="col-sm-12 col-md-6 col-lg-6">
-                  <div class="oh-input-group">
-                    <label class="oh-label required-star" for="id_country"
-                      >{% trans "Country" %}</label
-                    >
-                    <select
-                      name="country"
-                      id="id_country"
-                      required
-                      class="oh-select oh-select-2"
-                    ></select>
-                    {{form.country.errors}}
-                  </div>
-                </div>
-
-                <div class="col-sm-12 col-md-6 col-lg-6">
-                  <div class="oh-input-group">
-                    <label class="oh-label required-star" for="id_state"
-                      >{% trans "State" %}</label
-                    >
-                    <select
-                      name="state"
-                      required
-                      id="id_state"
-                      class="oh-select oh-select-2"
-                    ></select>
-                    {{form.state.errors}}
-                  </div>
-                </div>
-
-                <div class="col-sm-12 col-md-6 col-lg-6">
-                  <div class="oh-input-group">
-                    <label class="oh-label required-star" for="city"
-                      >{% trans "City" %}</label
-                    >
-                    <input
-                      type="text"
-                      id="city"
-                      required
-                      name="city"
-                      class="oh-input w-100"
-                      placeholder="e.g. Kerala"
-                    />
-                    {{form.city.errors}}
-                  </div>
-                </div>
-
-                <div class="col-sm-12 col-md-6 col-lg-6">
-                  <div class="oh-input-group">
-                    <label class="oh-label required-star" for="zip"
-                      >{% trans "Zip Code" %}</label
-                    >
-                    <input
-                      type="text"
-                      id="zip"
-                      required
-                      name="zip"
-                      class="oh-input w-100"
-                      placeholder="e.g. 611 293"
-                    />
-                    {{form.zip.errors}}
                   </div>
                 </div>
 
                 <div class="col-sm-12 col-md-12 col-lg-12">
-                  <button
-                    type="submit"
-                    class="oh-btn mt-4 oh-btn--secondary w-100 mb-4"
-                    onclick="validateForm(event)"
-                  >
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="license_action_taken">
+                      <input type="checkbox" id="license_action_taken" name="license_action_taken" value="true"/>
+                      {% trans "Have you ever had action taken against your professional license?" %}
+                    </label>
+                  </div>
+                </div>
+
+                <div class="col-sm-12 col-md-12 col-lg-12">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="background_check_consent">
+                      <input type="checkbox" id="background_check_consent" name="background_check_consent" value="true"/>
+                      {% trans "Are you willing to undergo background check and drug screen?" %}
+                    </label>
+                  </div>
+                </div>
+
+                 </div>
+                </div>
+
+                <!-- Agreements Section -->
+                     <div class="form-section">
+                  <h3>{% trans "Agreements" %}</h3>
+                  <div class="row">
+               
+
+                <div class="col-sm-12 col-md-12 col-lg-12">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="confidentiality_agreement">
+                      <input type="checkbox" id="confidentiality_agreement" name="confidentiality_agreement" value="true" required/>
+                      {% trans "I agree to the confidentiality agreement" %} *
+                    </label>
+                  </div>
+                </div>
+
+                <div class="col-sm-12 col-md-12 col-lg-12">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="employment_at_will">
+                      <input type="checkbox" id="employment_at_will" name="employment_at_will" value="true" required/>
+                      {% trans "I acknowledge employment at-will provision" %} *
+                    </label>
+                  </div>
+                </div>
+
+                  </div>
+                </div>
+
+                <!-- References Section -->
+
+                  <div class="form-section">
+                  <h3>{% trans "References" %}</h3>
+                  <div class="row">
+
+               
+                <!-- Reference 1 -->
+                <div class="col-sm-12 col-md-12 col-lg-12">
+                  <h6 class="mb-3">{% trans "Reference 1" %}</h6>
+                </div>
+
+                <div class="col-sm-12 col-md-6 col-lg-6">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="reference1_name">{% trans "Reference 1 Name" %}</label>
+                    <input type="text" id="reference1_name" name="reference1_name" class="oh-input w-100" placeholder="Reference name"/>
+                  </div>
+                </div>
+
+                <div class="col-sm-12 col-md-6 col-lg-6">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="reference1_phone">{% trans "Reference 1 Phone" %}</label>
+                    <input type="text" id="reference1_phone" name="reference1_phone" class="oh-input w-100" placeholder="Reference phone"/>
+                  </div>
+                </div>
+
+                <div class="col-sm-12 col-md-6 col-lg-6">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="reference1_company">{% trans "Reference 1 Company" %}</label>
+                    <input type="text" id="reference1_company" name="reference1_company" class="oh-input w-100" placeholder="Company name"/>
+                  </div>
+                </div>
+
+                <div class="col-sm-12 col-md-6 col-lg-6">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="reference1_position">{% trans "Reference 1 Position" %}</label>
+                    <input type="text" id="reference1_position" name="reference1_position" class="oh-input w-100" placeholder="Position title"/>
+                  </div>
+                </div>
+
+                <div class="col-sm-12 col-md-6 col-lg-6">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="reference1_dates">{% trans "Reference 1 Work Dates" %}</label>
+                    <input type="text" id="reference1_dates" name="reference1_dates" class="oh-input w-100" placeholder="Work dates together"/>
+                  </div>
+                </div>
+
+                <div class="col-sm-12 col-md-6 col-lg-6">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="reference1_type">{% trans "Reference 1 Type" %}</label>
+                    <select id="reference1_type" name="reference1_type" class="oh-select oh-select2 w-100">
+                      <option value="">Select Type</option>
+                      <option value="supervisor">Supervisor</option>
+                      <option value="professional">Professional</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Reference 2 -->
+                <div class="col-sm-12 col-md-12 col-lg-12">
+                  <h6 class="mt-4 mb-3">{% trans "Reference 2" %}</h6>
+                </div>
+
+                <div class="col-sm-12 col-md-6 col-lg-6">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="reference2_name">{% trans "Reference 2 Name" %}</label>
+                    <input type="text" id="reference2_name" name="reference2_name" class="oh-input w-100" placeholder="Reference name"/>
+                  </div>
+                </div>
+
+                <div class="col-sm-12 col-md-6 col-lg-6">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="reference2_phone">{% trans "Reference 2 Phone" %}</label>
+                    <input type="text" id="reference2_phone" name="reference2_phone" class="oh-input w-100" placeholder="Reference phone"/>
+                  </div>
+                </div>
+
+                <div class="col-sm-12 col-md-6 col-lg-6">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="reference2_company">{% trans "Reference 2 Company" %}</label>
+                    <input type="text" id="reference2_company" name="reference2_company" class="oh-input w-100" placeholder="Company name"/>
+                  </div>
+                </div>
+
+                <div class="col-sm-12 col-md-6 col-lg-6">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="reference2_position">{% trans "Reference 2 Position" %}</label>
+                    <input type="text" id="reference2_position" name="reference2_position" class="oh-input w-100" placeholder="Position title"/>
+                  </div>
+                </div>
+
+                <div class="col-sm-12 col-md-6 col-lg-6">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="reference2_dates">{% trans "Reference 2 Work Dates" %}</label>
+                    <input type="text" id="reference2_dates" name="reference2_dates" class="oh-input w-100" placeholder="Work dates together"/>
+                  </div>
+                </div>
+
+                <div class="col-sm-12 col-md-6 col-lg-6">
+                  <div class="oh-input-group">
+                    <label class="oh-label" for="reference2_type">{% trans "Reference 2 Type" %}</label>
+                    <select id="reference2_type" name="reference2_type" class="oh-select oh-select2 w-100">
+                      <option value="">Select Type</option>
+                      <option value="supervisor">Supervisor</option>
+                      <option value="professional">Professional</option>
+                    </select>
+                  </div>
+                </div>
+</div>
+</div>
+                <!-- Submit Button -->
+                <div class="col-sm-12 col-md-12 col-lg-12">
+                  <button type="submit" class="oh-btn mt-4 oh-btn--secondary w-100 mb-4" onclick="validateForm(event)">
                     <ion-icon name="checkmark-outline" class="me-2"></ion-icon>
                     {% trans "Apply" %}
                   </button>
@@ -322,7 +733,7 @@
 
                 <div class="col-sm-12 col-md-12 col-lg-12">
                   <p class="small text-muted text-center">
-                    &copy; {% now 'Y' %} {{white_label_company_name}}. All rights resevered.
+                    &copy; {% now 'Y' %} {{white_label_company_name}}. All rights reserved.
                   </p>
                 </div>
               </div>
@@ -330,14 +741,34 @@
           </div>
         </div>
       </div>
+      
       {% if resume %}
       <div class="col-12 col-md-6 col-lg-6 sticky">
         <iframe style="width: 100%;height:90vh" height="100" src="{{ resume.file.url }}" frameborder="0"></iframe>
-
       </div>
       {% else %}
       <div class="col-12 col-md-6 col-lg-6">
         <div class="oh-onboarding-preview oh-onboarding-card--top-bar w-100">
+          <a href="#" class="oh-btn oh-btn--light-bkg w-100" onclick="copyLink(window.location.origin+'/recruitment/application-form?recruitmentId={{recruitment.id}}')" title="{% trans "Share Link" %}">
+                  <ion-icon name="share-social-outline"></ion-icon>
+              </a>
+          <div class="oh-joblist__header">
+              
+              <div class="oh-job_recruit--detail">
+                  <div class="oh-recruitment-company">
+                      <img src="{{recruitment.company_id.icon.url}}" alt=""
+                          class="oh-job-list_company-logo">
+                  </div>
+                  <div class="oh-recuritment__details">
+                      <p class="oh-recuritment_company-name">{{recruitment.company_id}}</p>
+                      <span class="oh-job_post--posteddate">{{recruitment.created_at|timesince}}</span>
+                  </div>
+              </div>
+          </div>
+          <div class="d-flex mt-3 flex-wrap">
+              <div class="oh-recuritment_tag">JOB ID: {{recruitment.job_number}}</div>
+          </div>
+          
           {{recruitment.description|safe}}
           <div
             class="oh-onboarding-preview__content"
@@ -350,13 +781,16 @@
     </div>
   </div>
 </div>
+
 <script>
   {% include 'country.js' %}
   {% include 'select2.js' %}
+  
   var resume = "{{resume.file.url}}"
   {% if resume %}
     $("#resume").val(resume)
   {% endif %}
+  
   var description = `{{form.instance.recruitment_id.description|safe}}`
   var formattedDescription = description.replace(/\n/g, "<br>");
   $("#recruitmentInfoBody").html(formattedDescription);
@@ -367,19 +801,11 @@
         $(this).html('<strong>' + text + '</strong>');
       }
   });
+  
   function validateForm(event) {
-    // Profile image validation removed - image is now optional
-    // var fileInput = document.getElementById("photo");
-    // var errorList = document.getElementById("error-list");
-    // {% if not perms.recruitment.add_candidate %}
-    //   if (!fileInput.value) {
-    //     errorList.scrollIntoView({ behavior: "smooth", block: "center" });
-    //     errorList.style.display = "block"; // Show error message
-    //   } else {
-    //     errorList.style.display = "none"; // Hide error message
-    //   }
-    // {% endif %}
+    // Form validation logic here
   }
+  
   $(document).ready(function(){
     function getCookie(name) {
       let cookieValue = null;
@@ -387,7 +813,6 @@
         const cookies = document.cookie.split(";");
         for (let i = 0; i < cookies.length; i++) {
           const cookie = cookies[i].trim();
-          // Does this cookie string begin with the name we want?
           if (cookie.substring(0, name.length + 1) === name + "=") {
             cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
             break;
@@ -401,12 +826,10 @@
       if ($(selector).val() === "" ){
         $(selector).val(value);
         $(selector).change();
-
         $("[name=country]").parent().find("span").remove()
         $("[name=country]").select2()
       }
     }
-
 
     $("#matching_resume").on("click", function(){
       var file = $(this).data("value");
@@ -437,7 +860,6 @@
           setIfEmpty("[name='state']", state);
           setIfEmpty("[name='zip']", zip);
           $("[name='dob']").val(dob);
-
         },
         error: function(xhr, status, error) {
             console.error('File upload failed: ', status, error);
@@ -462,7 +884,6 @@
             'X-CSRFToken': getCookie("csrftoken")
         },
         success: function(response) {
-
           var full_name = response.full_name;
           var address = response.address;
           var country = response.country;
@@ -480,7 +901,6 @@
           setIfEmpty("[name='state']", state);
           setIfEmpty("[name='zip']", zip);
           $("[name='dob']").val(dob);
-
         },
         error: function(xhr, status, error) {
             console.error('File upload failed: ', status, error);

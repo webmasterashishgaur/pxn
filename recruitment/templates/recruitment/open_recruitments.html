@@ -13,6 +13,7 @@
         <link rel="icon" type="image/png" sizes="32x32" href="{% if white_label_company.icon %}{{white_label_company.icon.url}} {% else %}{% static 'favicons/favicon-32x32.png' %}{% endif %}">
         <link rel="icon" type="image/png" sizes="16x16" href="{% if white_label_company.icon %}{{white_label_company.icon.url}} {% else %}{% static 'favicons/favicon-16x16.png' %}{% endif %}">
         <link rel="stylesheet" href="{% static "/build/css/style.min.css" %}" />
+        
     </head>
 
     <body>
@@ -49,6 +50,9 @@
                     <div class="oh-layout--grid-3 oh-jobs__container--list pt-3">
                         {% for recruitment in recruitments %}
                             <div class="oh-kanban-card oh-joblist_card">
+                                <a href="#" class="oh-btn oh-btn--light-bkg w-100" onclick="copyLink(window.location.origin+'/recruitment/application-form?recruitmentId={{recruitment.id}}')" title="{% trans "Share Link" %}">
+                                    <ion-icon name="share-social-outline"></ion-icon>
+                                </a>
                                 <div class="oh-joblist__header">
                                     <div class="oh-job_recruit--detail">
                                         <div class="oh-recruitment-company">
@@ -126,7 +130,27 @@
         <script src="{% static "build/js/web.frontend.min.js" %}"></script>
         <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
         <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
-        <script></script>
+        <script src="https://code.jquery.com/jquery-3.7.1.slim.min.js" integrity="sha256-kmHvs0B+OpCW5GVHUNjv9rOmY0IvSIRcf7zGUDTDQM8=" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+        <script>
+          
+            function copyLink(link){
+                var $temp = $("<input>");
+                var $url = $(location).attr('href');
+                $("body").append($temp);
+                $temp.val(link).select();
+                document.execCommand("copy");
+                $temp.remove();
+                Swal.fire({
+                text: "Link copied",
+                icon: "success",
+                showConfirmButton: false,
+                timer: 3000, // Set the timer to 3000 milliseconds (3 seconds)
+                timerProgressBar: true, // Show a progress bar as the timer counts down
+                });
+            }
+            </script>
     </body>
 
 </html>

@@ -99,7 +99,7 @@ class ModelForm(forms.ModelForm):
                 self.fields[field_name].widget.attrs.update(
                     {
                         "id": uuid.uuid4,
-                        "class": "form-control w-100",
+                        "class": "oh-select oh-select2 w-100",
                     }
                 )
             elif isinstance(widget, (forms.Textarea)):
@@ -150,7 +150,7 @@ class RegistrationForm(forms.ModelForm):
                     label = _(field.label)
                 field.empty_label = _(f"---Choose {label}---").format(label=label)
                 self.fields[field_name].widget.attrs.update(
-                    {"id": uuid.uuid4, "class": "form-control w-100"}
+                    {"id": uuid.uuid4, "class": "oh-select oh-select2 w-100"}
                 )
             elif isinstance(widget, (forms.TextInput)):
                 field.widget.attrs.update(

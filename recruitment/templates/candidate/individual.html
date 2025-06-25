@@ -217,7 +217,11 @@
           {% endif %}
         </div>
       {% endif %}
-
+            <a href="{% url 'dynamic-resume-pdf' %}" class="oh-btn oh-btn--success" target="_blank">
+                <i class="fas fa-file-pdf pdf-icon"></i>
+                {% trans "Generate PDF" %}
+            </a>
+            
     </div>
     <div class="row">
       <div class="col-12 col-sm-12 col-md-12 col-lg-4">

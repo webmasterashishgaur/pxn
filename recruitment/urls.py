@@ -154,6 +154,7 @@ urlpatterns = [
     path("parse-resume-ajax", views.parse_resume_ajax, name="parse-resume-ajax"),
     path("candidate-registration-success", views.candidate_registration_success, name="candidate-registration-success"),
     path("candidate-registration-pdf", views.candidate_registration_pdf_psn_format, name="candidate-registration-pdf"),
+    path("dynamic-resume-pdf", views.dynamic_resume_pdf, name="dynamic-resume-pdf"),
     path(
         "recruitment-stage-get/<int:rec_id>/",
         views.recruitment_stage_get,
