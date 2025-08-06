@@ -217,10 +217,96 @@
           {% endif %}
         </div>
       {% endif %}
-            <a href="{% url 'dynamic-resume-pdf' %}" class="oh-btn oh-btn--success" target="_blank">
-                <i class="fas fa-file-pdf pdf-icon"></i>
-                {% trans "Generate PDF" %}
-            </a>
+          <a href="{% url 'dynamic-resume-pdf' %}" class="oh-btn oh-btn--success" style="border-radius:18px; " id="generate-pdf-btn">
+              <i class="fas fa-file-pdf pdf-icon"></i>
+              Generate PDF
+          </a>
+
+
+
+            <!-- नाम पूछने के लिए पॉपअप (Modal) -->
+<div id="pdf-name-popup" class="pdf-popup-overlay" style="display:none;">
+    <div class="pdf-popup-content">
+        <h3>Generate Resume PDF</h3>
+        <p>Please enter the name to whom this resume is addressed.</p>
+        <form id="pdf-name-form">
+            <input type="text" id="addressed-to-name" placeholder="Enter full name" required>
+            <input type="hidden" id="candidate-id-field" value="{{candidate.id}}"> <!-- यहाँ candidate_id डालें -->
+            <div id="popup-error" class="popup-error-msg" style="display:none;">Please enter a name.</div>
+            <div class="popup-buttons">
+                <button type="button" id="cancel-popup-btn" class="oh-btn oh-btn--danger">Cancel</button>
+                <button type="submit" class="oh-btn oh-btn--success">Generate</button>
+            </div>
+        </form>
+    </div>
+</div>
+<style>
+    .pdf-popup-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.6); display: flex;
+        justify-content: center; align-items: center; z-index: 1050;
+    }
+    .pdf-popup-content {
+        background: white; padding: 25px; border-radius: 8px;
+        width: 400px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    .pdf-popup-content input[type="text"] {
+        width: 100%; padding: 10px; margin: 15px 0; border: 1px solid #ccc; border-radius: 4px;
+    }
+    .popup-buttons { display: flex; justify-content: space-around; margin-top: 15px; }
+    .popup-error-msg { color: red; margin-bottom: 10px; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const generatePdfBtn = document.getElementById('generate-pdf-btn');
+    const popup = document.getElementById('pdf-name-popup');
+    const cancelBtn = document.getElementById('cancel-popup-btn');
+    const nameForm = document.getElementById('pdf-name-form');
+    const nameInput = document.getElementById('addressed-to-name');
+    const candidateIdInput = document.getElementById('candidate-id-field');
+    const errorDiv = document.getElementById('popup-error');
+
+    // "Generate PDF" बटन पर क्लिक करने पर पॉपअप दिखाएं
+    generatePdfBtn.addEventListener('click', function(event) {
+        event.preventDefault(); // लिंक को तुरंत फॉलो करने से रोकें
+        popup.style.display = 'flex';
+        nameInput.focus();
+    });
+
+    // "Cancel" बटन पर क्लिक करने पर पॉपअप छिपाएं
+    cancelBtn.addEventListener('click', function() {
+        popup.style.display = 'none';
+    });
+
+    // फॉर्म सबमिट होने पर
+    nameForm.addEventListener('submit', function(event) {
+        event.preventDefault(); // फॉर्म को सबमिट होने से रोकें
+
+        const addressedToName = nameInput.value.trim();
+        const candidateId = candidateIdInput.value;
+
+        // वैलिडेशन: नाम खाली नहीं होना चाहिए
+        if (addressedToName === '') {
+            errorDiv.style.display = 'block';
+            return;
+        } else {
+            errorDiv.style.display = 'none';
+        }
+
+        // PDF URL बनाएं और उस पर भेजें
+        const pdfUrl = new URL(generatePdfBtn.href);
+        pdfUrl.searchParams.append('name', addressedToName);
+        pdfUrl.searchParams.append('candidate_id', candidateId);
+
+        // नए URL को एक नई टैब में खोलें
+        window.open(pdfUrl.toString(), '_blank');
+
+        // पॉपअप को बंद कर दें
+        popup.style.display = 'none';
+        nameInput.value = ''; // इनपुट को साफ़ करें
+    });
+});
+</script>
             
     </div>
     <div class="row">
