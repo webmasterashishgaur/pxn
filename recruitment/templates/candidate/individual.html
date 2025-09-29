@@ -221,6 +221,10 @@
               <i class="fas fa-file-pdf pdf-icon"></i>
               Generate PDF
           </a>
+          <a href="{% url 'dynamic-resume-doc' %}" class="oh-btn oh-btn--success" style="border-radius:18px; margin-right:10px;" id="generate-doc-btn">
+              <i class="fas fa-file-pdf pdf-icon"></i>
+              Generate DOC
+          </a>
 
 
 
@@ -235,6 +239,21 @@
             <div id="popup-error" class="popup-error-msg" style="display:none;">Please enter a name.</div>
             <div class="popup-buttons">
                 <button type="button" id="cancel-popup-btn" class="oh-btn oh-btn--danger">Cancel</button>
+                <button type="submit" class="oh-btn oh-btn--success">Generate</button>
+            </div>
+        </form>
+    </div>
+</div>
+<div id="doc-name-popup" class="pdf-popup-overlay" style="display:none;">
+    <div class="pdf-popup-content">
+        <h3>Generate Resume DOC</h3>
+        <p>Please enter the name to whom this resume is addressed.</p>
+        <form id="doc-name-form">
+            <input type="text" id="addressed-to-name-doc" placeholder="Enter full name" required>
+            <input type="hidden" id="candidate-id-field-doc" value="{{candidate.id}}"> <!-- यहाँ candidate_id डालें -->
+            <div id="popup-error-doc" class="popup-error-msg" style="display:none;">Please enter a name.</div>
+            <div class="popup-buttons">
+                <button type="button" id="cancel-popup-btn-doc" class="oh-btn oh-btn--danger">Cancel</button>
                 <button type="submit" class="oh-btn oh-btn--success">Generate</button>
             </div>
         </form>
@@ -265,6 +284,56 @@ document.addEventListener('DOMContentLoaded', function() {
     const nameInput = document.getElementById('addressed-to-name');
     const candidateIdInput = document.getElementById('candidate-id-field');
     const errorDiv = document.getElementById('popup-error');
+
+    // "Generate PDF" बटन पर क्लिक करने पर पॉपअप दिखाएं
+    generatePdfBtn.addEventListener('click', function(event) {
+        event.preventDefault(); // लिंक को तुरंत फॉलो करने से रोकें
+        popup.style.display = 'flex';
+        nameInput.focus();
+    });
+
+    // "Cancel" बटन पर क्लिक करने पर पॉपअप छिपाएं
+    cancelBtn.addEventListener('click', function() {
+        popup.style.display = 'none';
+    });
+
+    // फॉर्म सबमिट होने पर
+    nameForm.addEventListener('submit', function(event) {
+        event.preventDefault(); // फॉर्म को सबमिट होने से रोकें
+
+        const addressedToName = nameInput.value.trim();
+        const candidateId = candidateIdInput.value;
+
+        // वैलिडेशन: नाम खाली नहीं होना चाहिए
+        if (addressedToName === '') {
+            errorDiv.style.display = 'block';
+            return;
+        } else {
+            errorDiv.style.display = 'none';
+        }
+
+        // PDF URL बनाएं और उस पर भेजें
+        const pdfUrl = new URL(generatePdfBtn.href);
+        pdfUrl.searchParams.append('name', addressedToName);
+        pdfUrl.searchParams.append('candidate_id', candidateId);
+
+        // नए URL को एक नई टैब में खोलें
+        window.open(pdfUrl.toString(), '_blank');
+
+        // पॉपअप को बंद कर दें
+        popup.style.display = 'none';
+        nameInput.value = ''; // इनपुट को साफ़ करें
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const generatePdfBtn = document.getElementById('generate-doc-btn');
+    const popup = document.getElementById('doc-name-popup');
+    const cancelBtn = document.getElementById('cancel-popup-btn-doc');
+    const nameForm = document.getElementById('doc-name-form');
+    const nameInput = document.getElementById('addressed-to-name-doc');
+    const candidateIdInput = document.getElementById('candidate-id-field-doc');
+    const errorDiv = document.getElementById('popup-error-doc');
 
     // "Generate PDF" बटन पर क्लिक करने पर पॉपअप दिखाएं
     generatePdfBtn.addEventListener('click', function(event) {

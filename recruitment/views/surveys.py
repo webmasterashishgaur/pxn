@@ -20,6 +20,7 @@ from django.utils.translation import gettext_lazy as _
 
 from base.methods import closest_numbers, get_pagination
 from horilla.decorators import (
+    logger,
     hx_request_required,
     is_recruitment_manager,
     login_required,
@@ -351,13 +352,34 @@ def application_form(request):
             recruitment = recruitment.first()
     if request.POST:
 
+        from recruitment.forms import CandidateRegistrationForm
+        from recruitment.methods import parse_resume_with_groq
+        from recruitment.models import ParsedResumeDetails
+        import json
+    
+
         if "resume" not in request.FILES and resume_id:
             if resume_obj and resume_obj.file:
                 file_content = resume_obj.file.read()
-                pdf_file = SimpleUploadedFile(
-                    resume_obj.file.name, file_content, content_type="application/pdf"
+                content_type = None
+                filename = resume_obj.file.name.lower()
+                
+                if filename.endswith(".pdf"):
+                    content_type = "application/pdf"
+                elif filename.endswith(".docx"):
+                    content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                elif filename.endswith(".doc"):
+                    content_type = "application/msword"
+                else:
+                    # Unsupported file type fallback (optional)
+                    content_type = "application/octet-stream"
+                
+                resume_file = SimpleUploadedFile(
+                    resume_obj.file.name,
+                    file_content,
+                    content_type=content_type,
                 )
-                request.FILES["resume"] = pdf_file
+                request.FILES["resume"] = resume_file
 
         form = ApplicationForm(request.POST, request.FILES)
         if form.is_valid():
@@ -409,20 +431,67 @@ def application_form(request):
                     return redirect(candidate_survey)
             candidate_obj.save()
 
+            if candidate_obj.resume:
+                try:
+
+                    resume_file = candidate_obj.resume
+                    filename = resume_file.name.lower()
+                   
+                    text = ""
+
+                    if filename.endswith(".pdf"):
+                        import PyPDF2
+                        pdf_reader = PyPDF2.PdfReader(resume_file)
+                        for page in pdf_reader.pages:
+                            text += page.extract_text()
+
+                    elif filename.endswith(".docx"):
+                        import docx
+                        doc = docx.Document(resume_file)
+                        text = "\n".join([para.text for para in doc.paragraphs])
+
+                    elif filename.endswith(".doc"):
+                        import textract
+                        # textract handles extraction from doc files
+                        text = textract.process(resume_file).decode('utf-8')
+
+                    else:
+                        # Unsupported format fallback (optional)
+                        text = ""
+                    
+                    # Parse with Groq
+                    if text.strip():
+                        parsed_details = parse_resume_with_groq(text)
+                        if parsed_details:
+                            # Create ParsedResumeDetails entry
+                            ParsedResumeDetails.objects.create(
+                                candidate=candidate_obj,
+                                education=parsed_details.get("education"),
+                                skills=parsed_details.get("skills"),
+                                experience=parsed_details.get("experience"),
+                                certifications=parsed_details.get("certifications"),
+                                summary=parsed_details.get("summary"),
+                                llm_model="meta-llama/llama-4-scout-17b-16e-instruct",
+                                raw_json=parsed_details,
+                            )
+                            
+                except Exception as e:
+                    logger.warning(f"Resume parsing failed: {e}")
+
             # Retrieve and persist parsed resume details from session
-            parsed_details = request.session.get("parsed_resume_details")
-            if parsed_details:
-                ParsedResumeDetails.objects.create(
-                    candidate=candidate_obj,
-                    education=parsed_details.get("education"),
-                    skills=parsed_details.get("skills"),
-                    experience=parsed_details.get("experience"),
-                    certifications=parsed_details.get("certifications"),
-                    summary=parsed_details.get("summary"),
-                    raw_json=parsed_details,
-                )
-                # Clear the session
-                del request.session["parsed_resume_details"]
+            # parsed_details = request.session.get("parsed_resume_details")
+            # if parsed_details:
+            #     ParsedResumeDetails.objects.create(
+            #         candidate=candidate_obj,
+            #         education=parsed_details.get("education"),
+            #         skills=parsed_details.get("skills"),
+            #         experience=parsed_details.get("experience"),
+            #         certifications=parsed_details.get("certifications"),
+            #         summary=parsed_details.get("summary"),
+            #         raw_json=parsed_details,
+            #     )
+            #     # Clear the session
+            #     del request.session["parsed_resume_details"]
 
             if resume_obj:
                 resume_obj.is_candidate = True

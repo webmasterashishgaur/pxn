@@ -4737,183 +4737,189 @@ from reportlab.lib import colors
 from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
 from recruitment.models import Candidate 
 
-# हर पेज पर हेडर और फुटर बनाने के लिए हेल्पर फ़ंक्शन
-def _header_footer(canvas, doc):
-    canvas.saveState()
-    
-    # --- हेडर ---
-    # कैनवास पर पहले से बनाई गई हेडर टेबल को बनाएं
-    header_table = doc.header_table
-    w, h = header_table.wrapOn(canvas, doc.width, doc.topMargin)
-    # y-पोजीशन को एडजस्ट करें ताकि यह पेज के टॉप पर सही से बैठे
-    header_table.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - h)
 
-    # --- फुटर ---
-    footer_y = doc.bottomMargin - 0.3 * inch
-    canvas.setFillColorRGB(0, 0, 0) # फुटर के लिए रंग वापस काला करें
-    canvas.setFont('Helvetica', 10)
-    name = doc.resume_data.get("name", "")
-    canvas.drawString(doc.leftMargin, footer_y, name)
-    page_num = str(canvas.getPageNumber())
-    canvas.drawRightString(doc.leftMargin + doc.width, footer_y, page_num)
 
-    canvas.restoreState()
-
+def safe_json_load(val):
+    # If None, return empty list
+    if val is None:
+        return []
+    # If already list/dict (parsed JSONField), return as is
+    if isinstance(val, (list, dict)):
+        return val
+    # If string, parse
+    if isinstance(val, str):
+        val = val.strip()
+        if not val:
+            return []
+        return json.loads(val)
+    # Unknown type, return empty list
+    return []
 
 def dynamic_resume_pdf(request):
-    """
-    उम्मीदवार के रिज्यूमे का PDF बिल्कुल सैंपल फॉर्मेट में जेनरेट करें
-    """
     from django.conf import settings
-    # from myapp.models import Candidate # अपने कैंडिडेट मॉडल को इम्पोर्ट करें
+    from io import BytesIO
+    from datetime import datetime
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image, Flowable
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
+    import json
+    import os
+    import ast
 
-    # स्टेप 1: URL से डेटा प्राप्त करें
-    addressed_to_name = request.GET.get('name', 'Default Name') # पॉपअप से आया नाम
-    candidate_id = request.GET.get('candidate_id')
+    from django.http import HttpResponse
+    from django.shortcuts import get_object_or_404
 
+    candidate_id = request.GET.get("candidate_id")
+    if not candidate_id:
+        return HttpResponse('candidate_id required as GET param', status=400)
 
-    if candidate_id:
+    obj = get_object_or_404(ParsedResumeDetails, candidate_id=candidate_id)
+
+    def safe_json_load(val):
         try:
-            # PostgreSQL की recruitment_candidate टेबल को क्वेरी करें [2]
-            candidate = Candidate.objects.get(id=candidate_id)
-            # मान लेते हैं कि आपकी टेबल में 'name' नाम का कॉलम है [2][4]
-            candidate_name = candidate.name 
-            candidate_job =  candidate.job_position_id
-            
-        except Candidate.DoesNotExist:
-            return HttpResponse(f"Error: Candidate with ID {candidate_id} not found.", status=404)
-    else:
-        return HttpResponse("Error: Candidate ID is required.", status=400)
+            if isinstance(val, (list, dict)):
+                return val
+            return json.loads(val) if val else []
+        except Exception as e:
+            print(f"JSON Parse Error: {e}, Value type: {type(val)}")
+            return []
 
+    education_list = safe_json_load(obj.education)
+    skills = safe_json_load(obj.skills)
+    experience_list = safe_json_load(obj.experience)
+    certifications = safe_json_load(obj.certifications)
 
+    def split_summary(summary):
+        if not summary:
+            return []
+        summary = summary.strip()
+        if summary.startswith("[") and summary.endswith("]"):
+            try:
+                return [s.strip().strip("'\"") for s in ast.literal_eval(summary)]
+            except Exception:
+                pass
+        for sep in ['\n', ';', '.']:
+            if sep in summary:
+                items = [s.strip() for s in summary.split(sep) if s.strip()]
+                if sep != '.' or len(items) > 1:
+                    return items
+        return [summary]
 
-    # स्टेप 2: candidate_id का उपयोग करके डेटाबेस से डेटा प्राप्त करें
-    # NOTE: यह हिस्सा आपको अपने मॉडल के अनुसार बदलना होगा।
-    # अभी के लिए, मैं आपके मौजूदा हार्डकोडेड डेटा का उपयोग कर रहा हूँ।
-    try:
-        # यह एक उदाहरण है, आपको इसे अपने मॉडल से बदलना होगा
-        # candidate = Candidate.objects.get(id=candidate_id)
-        # resume_data = {
-        #     "name": candidate.full_name,
-        #     "professional_summary": candidate.summary.split('\n'),
-        #     # ... बाकी का डेटा ...
-        # }
-        pass # नीचे वाला हार्डकोडेड डेटा अभी भी काम करेगा
-    except Exception as e:
-        # अगर कैंडिडेट नहीं मिलता है तो एक एरर दिखाएं
-        return HttpResponse(f"Candidate with ID {candidate_id} not found. Error: {e}", status=404)
+    summary = obj.summary or ""
+    candidate_name = obj.candidate.name
 
-    # आपका मौजूदा हार्डकोडेड डेटा (सिर्फ उदाहरण के लिए)
-    # **यहाँ मुख्य बदलाव है**
     today = datetime.now()
     formatted_date = today.strftime("%B %d, %Y")
-    # आपका पूरा स्टैटिक डेटा
+
     resume_data = {
-        "name": f"{candidate_name} - {candidate_job}", "date": formatted_date, "addressed_to": addressed_to_name,
-        "position": "Clinical Data Abstractor RN – Remote", "on_behalf_of": "Hazel Brown-Patterson, RN",
-        "professional_summary": [
-            "14+ years Registered Nurse with Clinical Oncology experience",
-            "Provide symptom management support to patients managing adverse effects of chemotherapy and immunotherapy.",
-            "ONS Certification", "3+ years Clinical Oncology Data Abstraction experience", "Certified Tumor Registrar",
-            "Review oncology clinical documents for pertinent information related to diagnosis, treatment, and complications of cancer care.",
-            "Exercised meticulous attention to detail required when reviewing 1,000+ medical records per patient."
-        ],
-        "education": [{"degree": "Bachelor of Science in Nursing", "institution": "Villa Julie College/Stevenson University, Stevenson, MD"}],
-        "experience": [
-            {"title": "Senior Technical Support Consultant, Clinical Application Support", "company": "Altera Digital Health, Niagara Falls, New York", "dates": "May 2023-Present", "bullets": ["Tier 3 client/hospital support managing issues related to the sunrise electronic health record.", "Provided education to clients on product, assisted to troubleshoot issues, and process defects in the system for patches and upgrades.", "Experience using service now product for cases/tickets and SQL data management system."]},
-            {"title": "RN Care Management", "company": "Florida Cancer Specialist, Fort Myers, Florida", "dates": "October 2022-May 2023", "bullets": ["Triage incoming calls from patients receiving treatment for hematologic or oncology diagnosis.", "Coordinate with MD/NP staff and clinic to facilitate scheduling of infusion, Lab, and follow up visits.", "Provide symptom management support to patients managing adverse effects of chemotherapy and immunotherapy.", "Answer questions related to disease process and educate on disease and treatments.", "Review imaging and lab results with patient and educate on MD recommendations.", "Follow up on patient needs in a timely and effective manner. Multitask and prioritize multiple calls and activities according to importance."]},
-            {"title": "RN-Data Abstraction specialist", "company": "Concert AI, Memphis, Tennessee", "dates": "November 2020-September 2022", "bullets": ["Review oncology clinical documents for pertinent information related to diagnosis, treatment, and complications of cancer care.", "Exercised meticulous attention to detail required when reviewing 1,000+ medical records per patient.", "Accuracy scores consistently greater than 97% with speed consistently better than 75% of others in this role.", "Communicate frequently with team members and project leads regarding changes in project needs.", "Continuously excelled with working independently as evidenced by frequent request by management and leadership team to move to more difficult projects within the company."]},
-            {"title": "RN-Abstractor", "company": "Flatiron Health, New York, New York", "dates": "June 2019-October 2020", "bullets": ["Review clinical documents for pertinent information as dictated by policy and procedures outlined by client's needs.", "Currently credentialed to abstract 10+ modules with \"A\" rating on quality and speed.", "Experience accessing multiple different records in a variety of hospital platforms.", "Communicate frequently with team leads regarding errors or complicated abstraction cases.", "Experience using outlook, citrix, and patient manager abstraction platform.", "Motivated independent worker with high score in efficiency and time management."]},
-            {"title": "Registered Nurse, Hospice and Palliative Care", "company": "Gilchrist Hospice, Hunt Valley, MD", "dates": "January 2016-October 2020", "bullets": ["Home care case manager responsible for symptom and medical management of 12-15 patients.", "Responsibilities include medication management, communicating with doctors to obtain orders for symptom management, calling in medications to pharmacy, triaging phone calls, reviewing medical records, educating patients and families on care at end of life, and providing emotional support to families.", "Position requires exceptional organization and time management skills.", "Requires attention to detail and precise assessment skills to diagnose and manage patient issues."]},
-            {"title": "Registered Nurse-Oncology, Outpatient Services", "company": "University of Maryland Medical Center", "dates": "January 2013-January 2016", "bullets": ["Assisted physicians with management of outpatient services including flowing doctor's clinic.", "Educated patients on chemotherapy side effects and expectations during treatment.", "Administered injections and infusions.", "Accessed ports for treatment and completed blood draws.", "Reviewed charts and medical records from outside facilities to assist physician with consults.", "Called in prescriptions.", "Triaged phone calls and assisted patients with symptom management.", "Complicated prior authorizations and forms to support patient's care/treatment.", "Required the ability to prioritize tasks and complete multiple different activities in a busy clinic setting to meet patient needs.", "Primarily used EPIC charting system."]},
-            {"title": "Registered Nurse- Oncology Leukemia/Lymphoma/Oncology ICU", "company": "Johns Hopkins Hospital, Baltimore, MD", "dates": "December 2010-January 2013", "bullets": ["Provided inpatient care to patients diagnosed with cancer.", "Primary focus was blood cancers.", "Managed critically ill patients with various cancer diagnosis.", "Administered chemotherapy and managed side effects of treatment.", "Administered blood products as needed.", "Managed care in a fast paced constantly changing environment.", "Communicated and managed care with multiple levels of staff including residents, fellows, and attending providers."]}
-        ],
-        "licensure_certifications": ["Registered Nurse in the State of Maryland, active and unencumbered.", "ONS Chemotherapy/Biotherapy Course", "ONS Certification", "Hospice and Palliative Care Certification", "Certified Tumor Registrar"],
-        "coordinator_name": "Caitlin Whiteis", "coordinator_email": "caitlinw@psninc.net", "director_email": "mphipps@psninc.net",
-        "signature_name": "Michelle Phipps, EdD, MSA, BSN, RN", "signature_title": "Director, Managed Care Services", "signature_company": "Professional Services Network, Inc."
+        "name": candidate_name,
+        "date": formatted_date,
+        "addressed_to": request.GET.get('name', 'Default Name'),
+        "position": request.GET.get('position', 'Not Specified'),
+        "professional_summary": split_summary(summary),
+        "education": education_list,
+        "experience": experience_list,
+        "licensure_certifications": certifications,
+        "skills": skills,
+        "coordinator_name": "Caitlin Whiteis",
+        "coordinator_email": "caitlinw@psninc.net",
+        "director_email": "mphipps@psninc.net",
+        "signature_name": "Michelle Phipps, EdD, MSA, BSN, RN",
+        "signature_title": "Director, Managed Care Services",
+        "signature_company": "Professional Services Network, Inc.",
     }
-    
+
     def get_value(key, default="N/A"):
         return resume_data.get(key) or default
-    
+
     buffer = BytesIO()
-    # ओवरलैप से बचने के लिए सही टॉप मार्जिन
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=2.6*inch, bottomMargin=1.0*inch)
-    
+    doc = SimpleDocTemplate(
+        buffer, pagesize=letter, rightMargin=72, leftMargin=72,
+        topMargin=2.8*inch, bottomMargin=1.0*inch
+    )
     styles = getSampleStyleSheet()
     story = []
-    
-    # --- हेडर की तैयारी ---
-    # इमेज से मिलता-जुलता स्काई ब्लू रंग [1]
+
     SKY_BLUE = colors.HexColor("#048BC2")
     BULLET_CHAR = u'\u2022'
+
+    class HrLine(Flowable):
+        def __init__(self, width, thickness=1, color=colors.grey):
+            Flowable.__init__(self)
+            self.width = width
+            self.thickness = thickness
+            self.color = color
+            self.height = thickness
+
+        def draw(self):
+            self.canv.setStrokeColor(self.color)
+            self.canv.setLineWidth(self.thickness)
+            self.canv.line(0, self.height / 2.0, self.width, self.height / 2.0)
+
+    def add_section_header_with_line(story, text, styles, page_width, padding=6):
+        header = Paragraph(text, styles['Heading2'])
+        story.append(header)
+        story.append(Spacer(1, 2))
+        hr = HrLine(page_width, thickness=1, color=colors.grey)
+        story.append(hr)
+        story.append(Spacer(1, padding))
+
     try:
         logo_path = os.path.join(settings.STATICFILES_DIRS[0], 'images/ui/auth-logo.png')
         logo = Image(logo_path, width=1.7*inch, height=0.5*inch) if os.path.exists(logo_path) else Paragraph("PSN", styles['Normal'])
     except Exception:
         logo = Paragraph("PSN", styles['Normal'])
 
-    # हेडर टेक्स्ट के लिए स्टाइल
     referred_by_style = ParagraphStyle('ReferredBy', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', textColor=SKY_BLUE)
     tagline_style = ParagraphStyle('Tagline', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', textColor=SKY_BLUE, alignment=TA_RIGHT, leading=11)
     address_style = ParagraphStyle('Address', parent=styles['Normal'], fontSize=9, textColor=SKY_BLUE, alignment=TA_CENTER, leading=12)
-
-    # हेडर टेबल बनाने के लिए सभी हिस्से
     referred_by = Paragraph("Resume Referred by:", referred_by_style)
     tagline = Paragraph("Specialists in Healthcare Recruitment & Staffing and<br/>Accreditation Preparation Services since 1990", tagline_style)
-    # एड्रेस में बुलेट्स को भी सही रंग में लाने के लिए HTML-जैसे टैग का इस्तेमाल
     address = Paragraph(f"402 King Farm Blvd., Suite 125-142 &bull; Rockville, MD 20850 &bull; Phone: 301-460-4089", address_style)
-
-    # हेडर का सही लेआउट बनाने वाली टेबल [1]
     inner_table = Table([[logo, tagline]], colWidths=[2.2*inch, 4.3*inch])
     inner_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('LEFTPADDING', (0,0), (-1,-1), 0),
         ('RIGHTPADDING', (0,0), (-1,-1), 0),
     ]))
-
-    # अंतिम हेडर टेबल
-    header_data = [
-        [referred_by],
-        [inner_table],
-        [address]
-    ]
+    header_data = [[referred_by],[inner_table],[address]]
     header_table = Table(header_data, colWidths=['100%'], rowHeights=[0.25*inch, 0.75*inch, 0.4*inch])
-    
     header_table.setStyle(TableStyle([
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 2), (0, 2), 8), # लाइन के लिए जगह
-
-        # एड्रेस वाली लाइन के नीचे हॉरिजॉन्टल लाइन [1][5]
-        ('LINEBELOW', (0, 2), (0, 2), 0.5, colors.lightgrey),
+        ('LEFTPADDING',(0,0),(-1,-1),0),
+        ('RIGHTPADDING',(0,0),(-1,-1),0),
+        ('BOTTOMPADDING',(0,2),(0,2),8),
+        ('LINEBELOW',(0,2),(0,2),0.5,colors.lightgrey),
     ]))
-    
-    # doc ऑब्जेक्ट पर डेटा अटैच करें
     doc.resume_data = resume_data
     doc.header_table = header_table
 
-    # --- स्टोरी जेनरेशन (बाकी कंटेंट जैसा था वैसा ही) ---
     title_style = ParagraphStyle('PSNTitle', parent=styles['Heading1'], fontSize=14, spaceAfter=15, alignment=TA_LEFT, textColor=colors.black, fontName='Helvetica-Bold')
     bullet_style = ParagraphStyle('Bullet', parent=styles['Normal'], leftIndent=20, bulletIndent=10, spaceAfter=6)
+    edu_degree_style = ParagraphStyle('EduDegree', parent=styles['Normal'], fontSize=11, leftIndent=20, bulletIndent=10, spaceAfter=0, fontName='Helvetica-Bold')
+    edu_inst_style = ParagraphStyle('EduInst', parent=styles['Normal'], fontSize=10, leftIndent=36, spaceAfter=8, fontName='Helvetica')
+
+    exp_title_style = ParagraphStyle('ExpTitle', parent=styles['Normal'], fontSize=12, spaceAfter=2, fontName='Helvetica-Bold')
+    exp_company_style = ParagraphStyle('ExpCompany', parent=styles['Normal'], fontSize=11, spaceAfter=2, fontName='Helvetica-Oblique')
+    exp_date_style = ParagraphStyle('ExpDate', parent=styles['Normal'], fontSize=10, spaceAfter=6, fontName='Helvetica', alignment=TA_RIGHT)
+    exp_resp_style = ParagraphStyle('ExpResp', parent=styles['Normal'], fontSize=10, leftIndent=20, bulletIndent=10, spaceAfter=4)
 
     # Page 1 content
-    story.append(Paragraph(get_value("name"), title_style))
-    story.append(Spacer(1, 12))
     story.append(Paragraph(get_value("date"), styles['Normal']))
     story.append(Spacer(1, 12))
     story.append(Paragraph(f"Dear {get_value('addressed_to')},", styles['Normal']))
     story.append(Spacer(1, 12))
-    intro_text = f"It is with {get_value('name')}, candidate for the position of {get_value('position')}, on behalf of {get_value('on_behalf_of')}."
+    intro_text = f"It is with pleasure that we present for your review and consideration, the resume of {candidate_name}, candidate for the position of {get_value('position')}."
     story.append(Paragraph(intro_text, styles['Normal']))
     story.append(Spacer(1, 15))
-    story.append(Paragraph("PROFESSIONAL SUMMARY", styles['Heading2']))
+    add_section_header_with_line(story, "PROFESSIONAL SUMMARY", styles, doc.width)
     story.append(Spacer(1, 10))
-    
     for item in get_value("professional_summary", []):
         story.append(Paragraph(item, bullet_style, bulletText=BULLET_CHAR))
     story.append(Spacer(1, 15))
-    contact_text = f"If you are interested in speaking with this candidate, please let us know. {get_value('coordinator_name')}, our Healthcare Project Coordinator will gladly assist in making the arrangements with our candidate. Please feel free to contact us ({get_value('coordinator_email')} / {get_value('director_email')}), if you have any questions."
+    contact_text = f"If you are interested in speaking with this candidate, please let us know. {get_value('coordinator_name')}, our Healthcare Project Coordinator will gladly assist in making the arrangements with {candidate_name}. Please feel free to contact us ({get_value('coordinator_email')} / {get_value('director_email')}), if you have any questions."
     story.append(Paragraph(contact_text, styles['Normal']))
     story.append(Spacer(1, 12))
     story.append(Paragraph("We look forward to hearing from you.", styles['Normal']))
@@ -4925,49 +4931,490 @@ def dynamic_resume_pdf(request):
     story.append(Paragraph(get_value('signature_name'), styles['Normal']))
     story.append(Paragraph(get_value('signature_title'), styles['Normal']))
     story.append(Paragraph(get_value('signature_company'), styles['Normal']))
-    
     story.append(PageBreak())
- 
-    # Page 2+ content
-    story.append(Paragraph(get_value("name"), title_style))
-    story.append(Spacer(1, 20))
-    story.append(Paragraph("EDUCATION", styles['Heading2']))
-    story.append(Spacer(1, 10))
-    for edu in get_value("education", []):
-        story.append(Paragraph(f"{edu.get('degree', 'N/A')}<br/>  {edu.get('institution', 'N/A')}", bullet_style, bulletText=BULLET_CHAR))
-        story.append(Spacer(1, 2))
-    story.append(Spacer(1, 15))
-    story.append(Paragraph("PROFESSIONAL EXPERIENCE", styles['Heading2']))
-    story.append(Spacer(1, 10))
-    
-    exp_style = ParagraphStyle('exp', parent=styles['Normal'], spaceAfter=6)
-    for exp in get_value("experience", []):
-        story.append(Paragraph(f"<b>{exp.get('title', 'N/A')}</b>", exp_style))
-        story.append(Paragraph(f"<i>{exp.get('company', 'N/A')}</i>", exp_style))
-        story.append(Paragraph(exp.get('dates', 'N/A'), exp_style))
-        story.append(Spacer(1, 2))
-        for bullet in exp.get('bullets', []):
-            story.append(Paragraph(bullet, bullet_style, bulletText=BULLET_CHAR))
-        story.append(Spacer(1, 15))
-    
-    story.append(PageBreak())
-    story.append(Paragraph(get_value("name"), title_style))
-    story.append(Spacer(1, 20))
-    story.append(Paragraph("LICENSURE & CERTIFICATIONS", styles['Heading2']))
-    story.append(Spacer(1, 10))
-    for cert in get_value("licensure_certifications", []):
-        story.append(Paragraph(cert, bullet_style,bulletText=BULLET_CHAR))
 
-    # --- PDF बनाएं ---
+    # EDUCATION SECTION - FULLY ROBUST
+    add_section_header_with_line(story, "EDUCATION", styles, doc.width)
+    if not education_list:
+        story.append(Paragraph("Education information not available", edu_inst_style))
+    else:
+        for edu in education_list:
+            degree = (edu.get('degree') or '').strip() if isinstance(edu, dict) else str(edu)
+            institution = (edu.get('institution') or '').strip() if isinstance(edu, dict) else ''
+            year = (edu.get('year') or '').strip() if isinstance(edu, dict) else ''
+            if not degree and not institution:
+                continue
+            story.append(Paragraph(degree if degree else "N/A", edu_degree_style, bulletText=BULLET_CHAR))
+            inst_line = ""
+            if institution:
+                inst_line += institution
+            if year:
+                if inst_line:
+                    inst_line += ", "
+                inst_line += year
+            if inst_line:
+                story.append(Paragraph(inst_line, edu_inst_style))
+            story.append(Spacer(1, 2))
+    story.append(Spacer(1, 15))
+
+    add_section_header_with_line(story, "PROFESSIONAL EXPERIENCE", styles, doc.width)
+    def format_date_range(start_date, end_date):
+        if not start_date:
+            return "N/A"
+        if not end_date or str(end_date).lower() in ['null', 'none', 'present', 'current']:
+            return f"{start_date}-Present"
+        return f"{start_date}-{end_date}"
+
+    for exp in experience_list:
+        title = (exp.get('title') or 'N/A') if isinstance(exp, dict) else str(exp)
+        company = (exp.get('company') or '') if isinstance(exp, dict) else ''
+        location = (exp.get('location') or '') if isinstance(exp, dict) else ''
+        start_date = (exp.get('start_date') or '') if isinstance(exp, dict) else ''
+        end_date = (exp.get('end_date') or '') if isinstance(exp, dict) else ''
+        responsibilities = exp.get('responsibilities', []) if isinstance(exp, dict) else []
+
+        title_company = f"{title}"
+        if company and company != 'N/A':
+            title_company += f", {company}"
+
+        date_range = format_date_range(start_date, end_date)
+
+        exp_header_data = [[Paragraph(title_company, exp_title_style), Paragraph(date_range, exp_date_style)]]
+        exp_header_table = Table(exp_header_data, colWidths=[4.3*inch, 2*inch])
+        exp_header_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+            ('RIGHTPADDING', (0,0), (-1,-1), 0),
+            ('TOPPADDING', (0,0), (-1,-1), 0),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ]))
+        story.append(exp_header_table)
+
+        if location:
+            story.append(Paragraph(location, exp_company_style))
+
+        for resp in responsibilities:
+            story.append(Paragraph((resp or '').strip(), exp_resp_style, bulletText=BULLET_CHAR))
+
+        story.append(Spacer(1, 15))
+
+    # CERTIFICATIONS
+    add_section_header_with_line(story, "LICENSURE & CERTIFICATIONS", styles, doc.width)
+    lic_cert = certifications
+    if not lic_cert:
+        story.append(Paragraph("No license or certification exist", bullet_style))
+    else:
+        for cert in lic_cert:
+            story.append(Paragraph(cert or '', bullet_style, bulletText=BULLET_CHAR))
+    story.append(Spacer(1, 15))
+
+    # SKILLS
+    add_section_header_with_line(story, "PROFESSIONAL SKILLS", styles, doc.width)
+    for skill in skills:
+        story.append(Paragraph(skill or '', bullet_style, bulletText=BULLET_CHAR))
+
+    def _header_footer(canvas, doc):
+        canvas.saveState()
+        header_table = doc.header_table
+        w, h = header_table.wrapOn(canvas, doc.width, doc.topMargin)
+        header_table.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - h)
+        canvas.setFont('Helvetica-Bold', 14)
+        name = doc.resume_data.get("name", "")
+        x_center = doc.leftMargin + doc.width / 2.0
+        y_name = doc.height + doc.topMargin - h - 24
+        canvas.drawCentredString(x_center, y_name, name)
+        footer_y = doc.bottomMargin - 0.3 * inch
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.setFont('Helvetica', 10)
+        canvas.drawString(doc.leftMargin, footer_y, name)
+        page_num = str(canvas.getPageNumber())
+        canvas.drawRightString(doc.leftMargin + doc.width, footer_y, page_num)
+        canvas.restoreState()
+
     doc.build(story, onFirstPage=_header_footer, onLaterPages=_header_footer)
-    
+
     pdf = buffer.getvalue()
     buffer.close()
-    
+    safe_name = candidate_name.replace(" ", "_")
     response = HttpResponse(content_type='application/pdf')
-    safe_name = get_value("name", "unknown").replace(" ", "_")
     response['Content-Disposition'] = f'attachment; filename="PSN_Resume_{safe_name}.pdf"'
     response.write(pdf)
-    
     return response
 
+
+
+def dynamic_resume_doc(request):
+    from django.http import HttpResponse
+    from django.shortcuts import get_object_or_404
+    from docx import Document
+    from docx.shared import Pt, Inches
+    from docx.enum.text import WD_PARAGRAPH_ALIGNMENT, WD_UNDERLINE
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import RGBColor
+    import json
+    import ast
+    from datetime import datetime
+
+    candidate_id = request.GET.get("candidate_id")
+    if not candidate_id:
+        return HttpResponse('candidate_id required as GET param', status=400)
+
+    obj = get_object_or_404(ParsedResumeDetails, candidate_id=candidate_id)
+
+    def safe_json_load(val):
+        try:
+            if isinstance(val, (list, dict)):
+                return val
+            return json.loads(val) if val else []
+        except Exception:
+            return []
+
+    education = safe_json_load(obj.education)
+    skills = safe_json_load(obj.skills)
+    experience = safe_json_load(obj.experience)
+    certifications = safe_json_load(obj.certifications)
+
+    def split_summary(summary):
+        if not summary:
+            return []
+        summary = summary.strip()
+        if summary.startswith("[") and summary.endswith("]"):
+            try:
+                return [s.strip().strip("'\"") for s in ast.literal_eval(summary)]
+            except Exception:
+                pass
+        for sep in ['\n', ';', '.']:
+            if sep in summary:
+                items = [s.strip() for s in summary.split(sep) if s.strip()]
+                if sep != '.' or len(items) > 1:
+                    return items
+        return [summary]
+
+    summary = obj.summary or ""
+    candidate_name = obj.candidate.name
+    today = datetime.now()
+    formatted_date = today.strftime("%B %d, %Y")
+
+    document = Document()
+
+    # Set document margins
+    sections = document.sections
+    for section in sections:
+        section.top_margin = Inches(1.2)
+        section.bottom_margin = Inches(1.0)
+        section.left_margin = Inches(1.0)
+        section.right_margin = Inches(1.0)
+
+     # SKY_BLUE color
+
+    SKY_BLUE = RGBColor(4, 139, 194)
+
+    from docx.shared import Pt, Inches
+    from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+    from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+
+    section = document.sections[0]
+    header = section.header
+
+    # --- Create Table --- #
+    table = header.add_table(rows=1, cols=2, width=Inches(6.5))
+    table.autofit = False
+    table.columns[0].width = Inches(2.1)
+    table.columns[1].width = Inches(4.4)
+
+    # --- LEFT CELL: Resume Referred + logo (no extra lines) --- #
+    left_cell = table.cell(0, 0)
+    left_cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
+    p_left = left_cell.paragraphs[0]
+    run1 = p_left.add_run("Resume Referred by:\n")
+    run1.font.size = Pt(10)
+    run1.font.color.rgb = SKY_BLUE
+    run1.bold = True
+    # Logo immediately below, same paragraph, no extra paragraph
+    try:
+        logo_path = os.path.join(settings.STATICFILES_DIRS[0], 'images', 'ui', 'auth-logo.png')
+        if os.path.exists(logo_path):
+            run2 = p_left.add_run()
+            run2.add_picture(logo_path, width=Inches(1.5), height=Inches(0.5))
+    except Exception:
+        run2 = p_left.add_run("PSN")
+        run2.bold = True
+        run2.font.size = Pt(16)
+        run2.font.color.rgb = SKY_BLUE
+    p_left.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+    p_left.space_after = Pt(0)
+
+    # --- RIGHT CELL: Specialist info (bottom right) --- #
+    right_cell = table.cell(0, 1)
+    right_cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.BOTTOM
+    p_right = right_cell.paragraphs[0]
+    special_text = "Specialists in Healthcare Recruitment & Staffing and\nAccreditation Preparation Services since 1990"
+    special_run = p_right.add_run(special_text)
+    special_run.font.size = Pt(10)
+    special_run.font.color.rgb = SKY_BLUE
+    special_run.bold = True
+    p_right.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
+    p_right.space_after = Pt(0)
+
+    # --- Address line: no extra space --- #
+    addr_para = header.add_paragraph(
+        "402 King Farm Blvd., Suite 125-142 • Rockville, MD 20850 • Phone: 301-460-4089"
+    )
+    addr_para.runs[0].font.size = Pt(9)
+    addr_para.runs[0].font.color.rgb = SKY_BLUE
+    addr_para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    addr_para.space_after = Pt(0)  # No extra space!
+
+    # --- HR line: no extra space before --- #
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    hr = OxmlElement('w:p')
+    pPr = OxmlElement('w:pPr')
+    pBdr = OxmlElement('w:pBdr')
+    bottom = OxmlElement('w:bottom')
+    bottom.set(qn('w:val'), 'single')
+    bottom.set(qn('w:sz'), '12')
+    bottom.set(qn('w:space'), '1')
+    bottom.set(qn('w:color'), 'C8C8C8')
+    pBdr.append(bottom)
+    pPr.append(pBdr)
+    hr.append(pPr)
+    header._element.append(hr)
+
+
+
+    
+
+    # Configure footer
+    footer = section.footer
+    footer_para = footer.add_paragraph()
+    
+    # Name on left
+    name_run = footer_para.add_run(candidate_name)
+    name_run.font.size = Pt(10)
+    name_run.bold = True
+    
+    # Tab for right alignment
+    tab_stops = footer_para.paragraph_format.tab_stops
+    tab_stops.add_tab_stop(Inches(6.5))
+    footer_para.add_run("\t")
+    
+    # Page number
+    page_run = footer_para.add_run()
+    fldChar1 = OxmlElement('w:fldChar')
+    fldChar1.set(qn('w:fldCharType'), 'begin')
+    instrText = OxmlElement('w:instrText')
+    instrText.text = "PAGE"
+    fldChar2 = OxmlElement('w:fldChar')
+    fldChar2.set(qn('w:fldCharType'), 'end')
+    page_run._r.append(fldChar1)
+    page_run._r.append(instrText)
+    page_run._r.append(fldChar2)
+    page_run.font.size = Pt(10)
+
+    def add_heading_with_underline(text):
+        p = document.add_paragraph()
+        run = p.add_run(text)
+        run.bold = True
+        run.font.size = Pt(12)
+        run.underline = WD_UNDERLINE.SINGLE
+        p.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+        p.space_after = Pt(6)
+        p.space_before = Pt(12)
+
+    def add_bullet_point(text):
+        p = document.add_paragraph()
+        p.style = 'List Bullet'
+        run = p.add_run(text)
+        run.font.size = Pt(10)
+        p.space_after = Pt(3)
+
+    def add_normal_paragraph(text):
+        p = document.add_paragraph(text)
+        if p.runs:
+            p.runs[0].font.size = Pt(10)
+        p.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+        p.space_after = Pt(6)
+        return p
+
+    def add_spacing(points=6):
+        p = document.add_paragraph()
+        p.space_after = Pt(points)
+
+    # Document content
+    add_normal_paragraph(formatted_date)
+    add_spacing(12)
+
+    addressed_to = request.GET.get('name', 'Default Name')
+    add_normal_paragraph(f"Dear {addressed_to},")
+    add_spacing(12)
+
+    position = request.GET.get('position', 'Not Specified')
+    intro_text = f"It is with pleasure that we present for your review and consideration, the resume of {candidate_name}, candidate for the position of {position}."
+    add_normal_paragraph(intro_text)
+    add_spacing(15)
+
+    # PROFESSIONAL SUMMARY
+    add_heading_with_underline("PROFESSIONAL SUMMARY")
+    
+    summary_items = split_summary(summary)
+    for item in summary_items:
+        if item.strip():
+            add_bullet_point(item.strip())
+
+    add_spacing(15)
+
+    contact_text = (
+        f"If you are interested in speaking with this candidate, please let us know. "
+        f"Caitlin Whiteis, our Healthcare Project Coordinator will gladly assist in making the arrangements with {candidate_name}. "
+        f"Please feel free to contact us (caitlinw@psninc.net / mphipps@psninc.net), if you have any questions."
+    )
+    add_normal_paragraph(contact_text)
+
+    add_normal_paragraph("We look forward to hearing from you.")
+    add_spacing(15)
+
+    add_normal_paragraph("Regards,")
+    add_spacing(30)
+
+    add_normal_paragraph("Michelle")
+    add_normal_paragraph("Michelle Phipps, EdD, MSA, BSN, RN")
+    add_normal_paragraph("Director, Managed Care Services")
+    add_normal_paragraph("Professional Services Network, Inc.")
+
+    # Page break
+    document.add_page_break()
+
+    # EDUCATION
+    add_heading_with_underline("EDUCATION")
+    
+    if not education:
+        add_normal_paragraph("Education information not available")
+    else:
+        for edu in education:
+            if isinstance(edu, dict):
+                degree = (edu.get('degree') or '').strip()
+                institution = (edu.get('institution') or '').strip()
+                year = (edu.get('year') or '').strip()
+            else:
+                degree = str(edu).strip()
+                institution = ''
+                year = ''
+            
+            # Degree as bullet point
+            if degree:
+                degree_para = document.add_paragraph()
+                degree_para.style = 'List Bullet'
+                degree_run = degree_para.add_run(degree)
+                degree_run.bold = True
+                degree_run.font.size = Pt(10)
+                degree_para.space_after = Pt(0)
+            
+            # Institution and year
+            if institution or year:
+                inst_text = ""
+                if institution:
+                    inst_text += institution
+                if year:
+                    if institution:
+                        inst_text += f", {year}"
+                    else:
+                        inst_text += year
+                
+                if inst_text:
+                    inst_para = document.add_paragraph(inst_text)
+                    inst_para.runs[0].font.size = Pt(10)
+                    inst_para.paragraph_format.left_indent = Inches(0.5)
+                    inst_para.space_after = Pt(6)
+
+    add_spacing(15)
+
+    # PROFESSIONAL EXPERIENCE
+    add_heading_with_underline("PROFESSIONAL EXPERIENCE")
+
+    def format_date_range(start, end):
+        if not start:
+            return "N/A"
+        if not end or str(end).lower() in ['null', 'none', 'present', 'current']:
+            return f"{start}-Present"
+        return f"{start}-{end}"
+
+    if experience:
+        for exp in experience:
+            if isinstance(exp, dict):
+                title = (exp.get('title') or 'N/A')
+                company = (exp.get('company') or '')
+                location = (exp.get('location') or '')
+                start_date = (exp.get('start_date') or '')
+                end_date = (exp.get('end_date') or '')
+                responsibilities = exp.get('responsibilities', [])
+            else:
+                title = str(exp)
+                company = ''
+                location = ''
+                start_date = ''
+                end_date = ''
+                responsibilities = []
+
+            # Job title and company
+            title_para = document.add_paragraph()
+            title_run = title_para.add_run(title)
+            title_run.bold = True
+            title_run.font.size = Pt(11)
+            
+            if company:
+                company_run = title_para.add_run(f", {company}")
+                company_run.bold = True
+                company_run.font.size = Pt(11)
+            
+            title_para.space_after = Pt(0)
+
+            # Date range
+            date_range = format_date_range(start_date, end_date)
+            date_para = document.add_paragraph(date_range)
+            date_para.runs[0].italic = True
+            date_para.runs[0].font.size = Pt(10)
+            date_para.space_after = Pt(0)
+
+            # Location
+            if location:
+                location_para = document.add_paragraph(location)
+                location_para.runs[0].italic = True
+                location_para.runs[0].font.size = Pt(10)
+                location_para.space_after = Pt(3)
+
+            # Responsibilities
+            if responsibilities:
+                for resp in responsibilities:
+                    if resp and resp.strip():
+                        add_bullet_point(resp.strip())
+
+            add_spacing(12)
+
+    # LICENSURE & CERTIFICATIONS
+    add_heading_with_underline("LICENSURE & CERTIFICATIONS")
+    
+    if not certifications:
+        add_normal_paragraph("No license or certification exist")
+    else:
+        for cert in certifications:
+            if cert and cert.strip():
+                add_bullet_point(cert.strip())
+
+    add_spacing(15)
+
+    # PROFESSIONAL SKILLS
+    add_heading_with_underline("PROFESSIONAL SKILLS")
+    
+    for skill in skills:
+        if skill and skill.strip():
+            add_bullet_point(skill.strip())
+
+    # Return DOCX file
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    safe_name = candidate_name.replace(" ", "_")
+    response['Content-Disposition'] = f'attachment; filename="PSN_Resume_{safe_name}.docx"'
+    document.save(response)
+    return response

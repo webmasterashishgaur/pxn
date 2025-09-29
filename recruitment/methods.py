@@ -81,17 +81,36 @@ def parse_resume_with_groq(resume_text, model="meta-llama/llama-4-scout-17b-16e-
     Returns a dict with keys: education, skills, experience, certifications, summary.
     """
     prompt = (
-        "You are an expert resume parser. Given the following resume text, extract the following fields as JSON:\n"
-        "- education: List of degrees, institutions, and years (if present)\n"
-        "- skills: List of skills (as found in the resume)\n"
-        "- experience: List of jobs with title, company, and years (if present)\n"
-        "- certifications: List of certifications (if present)\n"
-        "- summary: Professional summary (if present)\n\n"
-        "IMPORTANT: Only extract what is explicitly present in the text. Do NOT make up or infer any data. "
-        "If a section is missing, return an empty list or null for that field.\n\n"
-        "Return your answer as a JSON object with these keys: education, skills, experience, certifications, summary.\n\n"
-        "Make sure the JSON is valid and does not contain any extra text or characters."
-        "Resume text:\n" + resume_text
+        "You are an expert resume parser."
+        "Your task is to extract resume data from the input text."
+        "The output JSON should match the structure and detail level of the sample resume below."
+        "If a field is missing in the resume text, return it as null or an empty list."
+        "Do NOT infer or invent any data; only extract what is explicitly present."
+
+        "\n\n--- SAMPLE STRUCTURE ---\n"
+        "1. summary: Professional summary as detailed bullet points (not just a single paragraph).\n"
+        "2. education: List of degrees, institutions, and years (if available). Each entry should be:\n"
+        "   - degree: string\n"
+        "   - institution: string\n"
+        "   - year: string or null\n"
+        "3. experience: List of jobs. For each job, extract:\n"
+        "   - title: job title\n"
+        "   - company: company name\n"
+        "   - location: location (if mentioned)\n"
+        "   - start_date: month/year or year if available\n"
+        "   - end_date: month/year or year if available\n"
+        "   - responsibilities: list of detailed bullet points showing actual duties and tasks\n"
+        "4. certifications: List of certifications as found\n"
+        "5. skills: List of skills (as present in the resume)\n"
+
+        "IMPORTANT: For every job, extract all bullet points or listed responsibilities.\n"
+        "If a section or field is missing, return it as null or empty list.\n"
+        "Your output must be: a single JSON object with keys: summary, education, experience, certifications, skills.\n"
+
+        "\nReturn ONLY JSON, without any additional explanation or text.\n"
+
+        "\n--- Resume text follows ---\n"
+        + resume_text
     )
     try:
         client = Groq(api_key=os.environ.get("GROQ_API_KEY"))

@@ -155,6 +155,7 @@ urlpatterns = [
     path("candidate-registration-success", views.candidate_registration_success, name="candidate-registration-success"),
     path("candidate-registration-pdf", views.candidate_registration_pdf_psn_format, name="candidate-registration-pdf"),
     path("dynamic-resume-pdf", views.dynamic_resume_pdf, name="dynamic-resume-pdf"),
+    path("dynamic-resume-doc", views.dynamic_resume_doc, name="dynamic-resume-doc"),
     path(
         "recruitment-stage-get/<int:rec_id>/",
         views.recruitment_stage_get,
